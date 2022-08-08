@@ -9,7 +9,7 @@ module module_spherical_harmonics
      logical  :: allocated = .false.
      integer(i4b) :: l
      integer(i4b) :: mmax
-     real(dp) :: th,x,y
+     real(dp) :: th,ct,st
      real(dp), dimension(:), allocatable :: vm1
      real(dp), dimension(:), allocatable :: v
      real(dp), dimension(:), allocatable :: vp1
@@ -27,6 +27,34 @@ module module_spherical_harmonics
                          get_all_legendre_value
      
   end type legendre_value
+
+
+
+  type wigner_value
+     private
+     logical  :: allocated = .false.
+     integer(i4b) :: l
+     integer(i4b) :: nmax
+     integer(i4b) :: pdim
+     real(dp) :: beta,cb,cbh,sbh
+     real(dp), dimension(:), allocatable :: vm1
+     real(dp), dimension(:), allocatable :: v
+     real(dp), dimension(:), allocatable :: vp1
+   contains
+     procedure :: delete => delete_wigner_value
+     procedure :: allocate => allocate_wigner_value
+     procedure :: ind => index_wigner_value
+!     procedure :: init => initialise_legendre_value
+!     procedure :: next => next_legendre_value
+!     procedure :: deg => degree_legendre_value
+!     procedure :: get_single_legendre_value
+!     procedure :: get_slice_legendre_value
+!     procedure :: get_all_legendre_value     
+!     generic   :: get => get_single_legendre_value, &
+!                         get_slice_legendre_value,  &
+!                         get_all_legendre_value
+     
+  end type wigner_value
 
   
 contains
@@ -67,9 +95,9 @@ contains
     integer(i4b), intent(in) :: mmax
     call p%delete()    
     p%l  = 0
-    p%th = 0
-    p%x = cos(th)
-    p%y = sin(th)    
+    p%th = th
+    p%ct = cos(th)
+    p%st = sin(th)    
     p%mmax = mmax
     call p%allocate(mmax)       
     p%v(0) = sifourpi    
@@ -81,37 +109,35 @@ contains
     implicit none
     class(legendre_value), intent(inout) :: p
     integer(i4b) :: l,lold,m,mmax,im
-    real(dp) :: x,y,fac1,fac2
+    real(dp) :: ct,st,fac1,fac2
+    ! get local parameters
     lold = p%l
     l = lold+1
-    x = p%x
-    y = p%y        
+    ct = p%ct
+    st = p%st
     mmax = p%mmax
-    if(lold == 0) then       
-       p%vp1(0) = x*sqrt3*p%v(0)
-       if(mmax > 0) then
-          p%vp1(1) = -sqrt3*y*p%v(0)/sqrt2
-       end if       
-    else
-       do m = 0,min(mmax,l-2)
-          fac1 = (4.0_dp*l*l-1.0_dp)/(l*l-m*m)
-          fac1 = sqrt(fac1)
-          fac2 = ( (l-1.0_dp)*(l-1.0_dp)-m*m)            &
-                  /(4.0_dp*(l-1.0_dp)*(l-1.0_dp)-1.0_dp)
-          fac2 = sqrt(fac2)
-          p%vp1(m) = fac1*(x*p%v(m) - fac2*p%vm1(m))
-       end do
-       if(l-1 <= mmax) then
-          fac1 = 2.0_dp*l+1
-          fac1 = sqrt(fac1)
-          p%vp1(l-1) = x*fac1*p%v(l-1)
-       end if
-       if(l <= mmax) then
-          fac1 = (l+0.5_dp)/l
-          fac1 = sqrt(fac1)
-          p%vp1(l) = -fac1*y*p%v(l-1)
-       end if
+    ! apply three-term recursion
+    do m = 0,min(mmax,l-2)
+       fac1 = (4.0_dp*l*l-1.0_dp)/(l*l-m*m)
+       fac1 = sqrt(fac1)
+       fac2 = ( (l-1.0_dp)*(l-1.0_dp)-m*m)            &
+               /(4.0_dp*(l-1.0_dp)*(l-1.0_dp)-1.0_dp)
+       fac2 = sqrt(fac2)
+       p%vp1(m) = fac1*(ct*p%v(m) - fac2*p%vm1(m))
+    end do
+    ! two-term recursion for m == l-1
+    if(l-1 <= mmax) then
+       fac1 = 2.0_dp*l+1
+       fac1 = sqrt(fac1)
+       p%vp1(l-1) = ct*fac1*p%v(l-1)
     end if
+    ! two term recursion for m = l
+    if(l <= mmax) then
+       fac1 = (l+0.5_dp)/l
+       fac1 = sqrt(fac1)
+       p%vp1(l) = -fac1*st*p%v(l-1)
+    end if
+    ! update the data arrays
     p%l = p%l+1
     im = min(lold,mmax)
     p%vm1(0:im) = p%v(0:im)
@@ -134,7 +160,6 @@ contains
     integer(i4b), intent(in) :: m
     logical, intent(in), optional :: flip
     real(dp) :: v
-
     call error(.not.p%allocated,'get_single_legendre_value','not allocated')
     call error(abs(m) > p%mmax, 'get_single_legendre_value','m out of range')  
     v = p%v(abs(m))
@@ -143,8 +168,7 @@ contains
        if(flip .and. modulo(p%l+m,2) /= 0) then
           v = -v          
        end if
-    end if
-   
+    end if   
     return
   end function get_single_legendre_value
 
@@ -271,10 +295,68 @@ contains
 
 
 
+  !============================================================================!
+  !============================================================================!
+  !              procedures for generalised legendre polynomials               !
+  !============================================================================!
+  !============================================================================!
 
 
-
+  subroutine delete_wigner_value(p)
+    implicit none
+    class(wigner_value), intent(inout) :: p
+    if(.not.p%allocated) return
+    deallocate(p%vm1)
+    deallocate(p%v)
+    deallocate(p%vp1)
+    p%allocated = .false.
+    return
+  end subroutine delete_wigner_value
   
   
+  subroutine allocate_wigner_value(p,nmax)
+    implicit none
+    class(wigner_value), intent(inout) :: p
+    integer(i4b), intent(in) :: nmax
+    integer(i4b) :: pdim
+    if(p%allocated) call p%delete()
+    p%allocated = .true.
+    return
+  end subroutine allocate_wigner_value
+
+  function index_wigner_value(p,n,m) result(i)
+    implicit none
+    class(wigner_value), intent(in) :: p
+    integer(i4b), intent(in) :: m,n
+    integer(i4b) :: i,mmax
+
+    return
+  end function index_wigner_value
+  
+
+  subroutine initialise_wigner_value(p,beta,mmax,nmax)
+    implicit none
+    class(wigner_value), intent(inout) :: p
+    real(dp), intent(in) :: beta
+    integer(i4b), intent(in) :: mmax,nmax
+    integer(i4b) :: i
+    call p%delete()    
+    return
+  end subroutine initialise_wigner_value
+
+  subroutine next_wigner_value(p)
+    implicit none
+    class(wigner_value), intent(inout) :: p
+    integer(i4b) :: l,lold,m,n,mmax,nmax,i,mlim
+    real(dp) :: cb,cbh,sbh,fac1,fac2,fac3
+
+     
+
+
+    
+    
+    
+    return
+  end subroutine next_wigner_value
   
 end module module_spherical_harmonics
