@@ -83,7 +83,10 @@ contains
     p%x = cos(th)
     p%y = sin(th)    
     p%mmax = min(l,mmax)
-    call p%allocate(mmax)       
+    call p%allocate(mmax)
+    if(l > 0) then
+       call legendre(l-1,p%mmax,th,p%vm1)
+    end if
     call legendre(l,p%mmax,th,p%v)           
     return
   end subroutine initialise_legendre_value

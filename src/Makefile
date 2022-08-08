@@ -3,7 +3,7 @@
 #################################################
 MOD=../mod/
 LOBJ=../obj/
-BIN=/home/david/codes/bin/
+BIN=../bin/
 VPATH = $(BIN):$(LOBJ)
 
 # set the compiler and flags
