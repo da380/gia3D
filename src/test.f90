@@ -15,17 +15,17 @@ program test
 
   type(legendre_value) :: p
 
-  lmax = 512
-  mmax = lmax
+  lmax = 20
+  mmax = 5
   th = 0.3_dp
 
-  call cpu_time(start)
-  call p%init(th,mmax)
+  call p%init(th,mmax)  
+  print *, p%deg(),p%get()
   do l = 1,lmax
      call p%next()     
+     print *, p%deg(),p%get()
   end do
-  call cpu_time(finish)
-  print *, finish-start
+
 
 
 
