@@ -3,7 +3,7 @@ module module_spherical_harmonics
   use module_constants
   use module_error
 
-  
+
   type legendre_value
      private
      logical  :: allocated = .false.
