@@ -18,7 +18,7 @@ MV=mv -f
 #####################################################
 #             list of excutable programs            #
 #####################################################
-SRCS = test.f90       
+SRCS = test.f90  test2.f90
 
 
 ###########################################################
@@ -44,6 +44,7 @@ MOD_SRCS = module_constants.f90            \
 EXCT     = $(SRCS:%.f90=%)
 OBJS     = $(SRCS:%.f90=$(LOBJ)%.o)
 MOD_OBJS = $(MOD_SRCS:%.f90=$(LOBJ)%.o)
+BINEXCT     = $(EXCT:%=$(BIN)%)
 
 
 all: $(EXCT)
@@ -62,4 +63,4 @@ $(MOD_OBJS): $(MOD_SRCS)
 clean:
 	@rm $(LOBJ)*.o
 	@rm $(MOD)*.mod
-
+	@rm $(BINEXCT)
