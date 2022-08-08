@@ -1,5 +1,5 @@
 *.o
 *.mod
-mod
-obj
-bin
+**/mod
+**/obj
+**/bin
