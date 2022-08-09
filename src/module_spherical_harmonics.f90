@@ -5,7 +5,7 @@ module module_spherical_harmonics
 
 
   type legendre_value
-!     private
+     private
      logical  :: allocated = .false.
      integer(i4b) :: l
      integer(i4b) :: mmax
@@ -21,16 +21,21 @@ module module_spherical_harmonics
      procedure :: deg => degree_legendre_value
      procedure :: get_single_legendre_value
      procedure :: get_slice_legendre_value
-     procedure :: get_all_legendre_value     
      generic   :: get => get_single_legendre_value, &
-                         get_slice_legendre_value,  &
-                         get_all_legendre_value
-     
+                         get_slice_legendre_value     
   end type legendre_value
+  private :: delete_legendre_value,     &
+             allocate_legendre_value,   &
+             initialise_legendre_value, &
+             next_legendre_value,       &
+             degree_legendre_value,     &
+             get_single_legendre_value, &
+             get_slice_legendre_value
 
 
 
   type wigner_value
+     private
      logical :: allocated = .false.
      logical :: transposed = .false.
      integer(i4b) :: l
@@ -46,16 +51,18 @@ module module_spherical_harmonics
      procedure :: ind => index_wigner_value
      procedure :: init => initialise_wigner_value
      procedure :: next => next_wigner_value
-!     procedure :: deg => degree_legendre_value
-!     procedure :: get_single_legendre_value
-!     procedure :: get_slice_legendre_value
-!     procedure :: get_all_legendre_value     
-!     generic   :: get => get_single_legendre_value, &
-!                         get_slice_legendre_value,  &
-!                         get_all_legendre_value
-     
+     procedure :: deg => degree_wigner_value
+     procedure :: get_single_wigner_value
+     procedure :: get_slice_wigner_value
+     generic   :: get => get_single_wigner_value, &
+                         get_slice_wigner_value
   end type wigner_value
-
+  private :: delete_wigner_value,     &
+             allocate_wigner_value,   &
+             initialise_wigner_value, &
+             next_wigner_value,       &
+             degree_wigner_value,     &
+             get_single_wigner_value
   
 contains
 
@@ -193,18 +200,6 @@ contains
     return
   end function get_slice_legendre_value
 
-
-  function get_all_legendre_value(p,flip) result(v)
-    implicit none
-    class(legendre_value), intent(in) :: p
-    real(dp), dimension(0:min(p%l,p%mmax)) :: v
-    logical, intent(in), optional :: flip
-    integer(i4b) :: m,im
-    call error(.not.p%allocated,'get_single_legendre_value','not allocated')
-    v = p%v(0:min(p%l,p%mmax))
-    return
-  end function get_all_legendre_value
-  
   
   subroutine legendre(l,mmax,th,p)
     implicit none
@@ -374,9 +369,9 @@ contains
     xl = l
     beta = p%beta
     cb = cos(beta)    
-    i = 0
-    
+    i = 0    
     if(l == 1) then
+       ! deal with l = 1 separately
        i = i+1
        p%vp1(i) = cb       
     else
@@ -399,15 +394,10 @@ contains
           end do
        end do
     end if
-
-
-    
     ! set edge values directly
     if(l <= mmax) then      
-
        chb = cos(0.5_dp*beta)
        shb = sin(0.5_dp*beta)
-
        if(shb <= 0.0_dp) then
           ! set special values at beta = 0.0
           do n = -min(l,nmax),min(l-1,nmax)
@@ -417,10 +407,8 @@ contains
           if(l <= nmax) then
              i = i+1
              p%vp1(i) = 1.0_dp
-          end if          
-          
-       else if(chb <= 0.0_dp) then
-         
+          end if                    
+       else if(chb <= 0.0_dp) then         
           ! set special value at beta == pi
           if(l <= nmax) then
              i = i+1
@@ -429,46 +417,120 @@ contains
           do n = -min(l-1,nmax),min(l,nmax)
              i = i+1
              p%vp1(i) = 0.0_dp
-          end do          
-          
-
+          end do                    
        else
-
           ! deal with interior arguments
-
           chb = log(chb)
-          shb = log(shb)
-          
+          shb = log(shb)          
           nm = min(l,nmax)
           do n = -nm,nm
              xn = n
              i = i+1
-
              fac1 =  0.5_dp*(log_gamma(2*xl+1)-log_gamma(xl-xn+1)  &
-                           - log_gamma(xl+xn+1))+(l+n)*chb + (l-n)*shb
-
+                           - log_gamma(xl+xn+1)) + (l+n)*chb + (l-n)*shb
              fac1 = exp(fac1)
              if(modulo(l-n,2) /= 0) fac1 = -fac1
-
              p%vp1(i) = fac1
-              
-
-             
-
           end do
-       
        end if
-
     end if
-
-
     p%l = l
     p%vm1 = p%v
     p%v = p%vp1
-
-
-    
     return
   end subroutine next_wigner_value
+
+  function degree_wigner_value(p) result(l)
+    implicit none
+    class(wigner_value), intent(in) :: p
+    integer(i4b) :: l
+    l = p%l
+    return
+  end function degree_wigner_value
+
+
+
+  
+  function get_single_wigner_value(p,nin,min,flip) result(v)
+    implicit none
+    class(wigner_value), intent(in) :: p
+    integer(i4b), intent(in) :: nin,min
+    logical, intent(in), optional  :: flip
+    real(dp) :: v
+    logical ::  check
+    integer(i4b) :: l,n,m,i,sign,mmax,nmax,j    
+    call error(.not.p%allocated,'get_single_wigner_value','not allocated')
+    l = p%l    
+    ! transpose the indices if needed
+    if(p%transposed) then
+       n = min
+       m = nin
+    else
+       n = nin       
+       m = min
+    end if
+    mmax = p%mmax
+    nmax = p%nmax
+    call error(abs(m) > mmax, 'get_single_wigner_value','m out of range')
+    call error(abs(n) > nmax, 'get_single_wigner_value','n out of range')  
+    sign = 1
+    if(present(flip)) then
+       if(flip) then
+          ! map beta to pi-beta
+          if(modulo(l-n,2) /= 0) sign = -1
+          j = n
+          n = m
+          m = -j
+       end if
+    end if
+    if(m < 0 .and. abs(n) <= abs(m)) then
+       ! parity transform
+       if(modulo(n-m,2) /= 0) sign = -sign
+       m = -m
+       n = -n
+    else if(n > abs(m)) then
+       ! reflection in diagonal
+       if(modulo(n-m,2) /= 0) sign = -sign
+       j = n
+       n = m
+       m = j
+    else if(n < -abs(m)) then
+       ! parity and reflection
+       j = n
+       n = -m
+       m = -j
+    end if
+    if(p%transposed) then
+       ! fix sign if the transposed matrix is stored
+       if(modulo(n-m,2) /= 0) sign = -sign
+    end if
+    i = p%ind(n,m)
+    v = sign*p%v(i)
+    return
+  end function get_single_wigner_value
+
+  
+  function get_slice_wigner_value(p,n1,n2,m1,m2,flip) result(v)
+    implicit none
+    class(wigner_value), intent(in) :: p
+    integer(i4b), intent(in) :: n1,n2,m1,m2
+    real(dp), dimension(n2-n1+1,m2-m1+1) :: v
+    logical, intent(in), optional :: flip
+    integer(i4b) :: n,m,i,j
+    i = 0
+    do n = n1,n2
+       i = i+1
+       j = 0
+       do m = m1,m2
+          j = j+1
+          v(i,j) = p%get(n,m,flip)          
+       end do
+    end do
+    return
+  end function get_slice_wigner_value
+
+  
+
+
   
 end module module_spherical_harmonics

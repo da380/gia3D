@@ -9,33 +9,28 @@ program test
 
   
   integer(i4b) :: l,lp,m,n,lmax,mmax,nmax,i
-  real(dp) :: beta,start,finish,time1,time2
+  real(dp) :: beta,start,finish,time1,time2,v
   real(dp), dimension(:,:), allocatable :: d
   
   type(wigner_value) :: p
 
   type(legendre_value) :: q
   
-  l = 2
+  l = 3
   nmax = 1
   mmax = l
-  beta = 0.200_dp
-  call p%init(beta,nmax,mmax)
+  beta = 0.2_dp
+  call p%init(beta,nmax,mmax)  
   do lp = 0,l-1
      call p%next()
   end do
 
 
-  allocate(d(-nmax:nmax,-l:l))
-  d = 0.0_dp
-  do m = 0,l
-     do n = -min(nmax,m),min(nmax,m)
-        i = p%ind(n,m)
-        d(n,m) = p%v(i)
-     end do
-  end do
+  allocate(d(2*nmax+1,2*mmax+1))
+  d = p%get(-nmax,nmax,-mmax,mmax)
 
-  do n = -nmax,nmax
+  
+  do n = 1,2*nmax+1
      print *, d(n,:)
   end do
 
