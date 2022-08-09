@@ -1,7 +1,5 @@
 program test
 
-
-
   use module_constants
   use module_spherical_harmonics
   use module_quadrature
