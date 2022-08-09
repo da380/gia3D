@@ -5,11 +5,11 @@ module module_spherical_harmonics
 
 
   type legendre_value
-     private
+!     private
      logical  :: allocated = .false.
      integer(i4b) :: l
      integer(i4b) :: mmax
-     real(dp) :: th,ct,st
+     real(dp) :: th
      real(dp), dimension(:), allocatable :: vm1
      real(dp), dimension(:), allocatable :: v
      real(dp), dimension(:), allocatable :: vp1
@@ -31,12 +31,12 @@ module module_spherical_harmonics
 
 
   type wigner_value
-     private
-     logical  :: allocated = .false.
+     logical :: allocated = .false.
+     logical :: transposed = .false.
      integer(i4b) :: l
      integer(i4b) :: nmax
-     integer(i4b) :: pdim
-     real(dp) :: beta,cb,cbh,sbh
+     integer(i4b) :: mmax
+     real(dp) :: beta
      real(dp), dimension(:), allocatable :: vm1
      real(dp), dimension(:), allocatable :: v
      real(dp), dimension(:), allocatable :: vp1
@@ -44,8 +44,8 @@ module module_spherical_harmonics
      procedure :: delete => delete_wigner_value
      procedure :: allocate => allocate_wigner_value
      procedure :: ind => index_wigner_value
-!     procedure :: init => initialise_legendre_value
-!     procedure :: next => next_legendre_value
+     procedure :: init => initialise_wigner_value
+     procedure :: next => next_wigner_value
 !     procedure :: deg => degree_legendre_value
 !     procedure :: get_single_legendre_value
 !     procedure :: get_slice_legendre_value
@@ -84,6 +84,9 @@ contains
     allocate(p%vm1(0:mmax))
     allocate(p%v(0:mmax))
     allocate(p%vp1(0:mmax))
+    p%vm1 = 0.0_dp
+    p%v   = 0.0_dp
+    p%vp1 = 0.0_dp
     p%allocated = .true.
     return
   end subroutine allocate_legendre_value
@@ -96,11 +99,9 @@ contains
     call p%delete()    
     p%l  = 0
     p%th = th
-    p%ct = cos(th)
-    p%st = sin(th)    
     p%mmax = mmax
     call p%allocate(mmax)       
-    p%v(0) = sifourpi    
+    p%v(0) = sifourpi
     return
   end subroutine initialise_legendre_value
 
@@ -109,15 +110,16 @@ contains
     implicit none
     class(legendre_value), intent(inout) :: p
     integer(i4b) :: l,lold,m,mmax,im
-    real(dp) :: ct,st,fac1,fac2
+    real(dp) :: th,ct,st,fac1,fac2
     ! get local parameters
     lold = p%l
     l = lold+1
-    ct = p%ct
-    st = p%st
+    th = p%th
+    ct = cos(th)
+    st = sin(th)
     mmax = p%mmax
     ! apply three-term recursion
-    do m = 0,min(mmax,l-2)
+    do m = 0,min(mmax,l-1)
        fac1 = (4.0_dp*l*l-1.0_dp)/(l*l-m*m)
        fac1 = sqrt(fac1)
        fac2 = ( (l-1.0_dp)*(l-1.0_dp)-m*m)            &
@@ -125,12 +127,6 @@ contains
        fac2 = sqrt(fac2)
        p%vp1(m) = fac1*(ct*p%v(m) - fac2*p%vm1(m))
     end do
-    ! two-term recursion for m == l-1
-    if(l-1 <= mmax) then
-       fac1 = 2.0_dp*l+1
-       fac1 = sqrt(fac1)
-       p%vp1(l-1) = ct*fac1*p%v(l-1)
-    end if
     ! two term recursion for m = l
     if(l <= mmax) then
        fac1 = (l+0.5_dp)/l
@@ -314,12 +310,24 @@ contains
   end subroutine delete_wigner_value
   
   
-  subroutine allocate_wigner_value(p,nmax)
+  subroutine allocate_wigner_value(p,nmax,mmax)
     implicit none
     class(wigner_value), intent(inout) :: p
-    integer(i4b), intent(in) :: nmax
-    integer(i4b) :: pdim
+    integer(i4b), intent(in) :: nmax,mmax
+    integer(i4b) :: pdim,n,m
     if(p%allocated) call p%delete()
+    if(mmax >= nmax) then
+       p%mmax = mmax
+       p%nmax = nmax
+    else
+       p%transposed = .true.
+       p%mmax = nmax
+       p%nmax = mmax
+    end if
+    pdim = (p%mmax+1)*(1+2*p%nmax) - p%nmax*(p%nmax+1)
+    allocate(p%vm1(pdim))
+    allocate(p%v(pdim))
+    allocate(p%vp1(pdim))    
     p%allocated = .true.
     return
   end subroutine allocate_wigner_value
@@ -329,32 +337,123 @@ contains
     class(wigner_value), intent(in) :: p
     integer(i4b), intent(in) :: m,n
     integer(i4b) :: i,mmax
-
+    if(m <= p%nmax) then
+       i = m**2 + n+m+1
+    else
+       i = (p%nmax+1)**2 + (m-p%nmax-1)*(2*p%nmax+1) + n+p%nmax+1
+    end if     
     return
   end function index_wigner_value
-  
 
-  subroutine initialise_wigner_value(p,beta,mmax,nmax)
+  
+  subroutine initialise_wigner_value(p,beta,nmax,mmax)
     implicit none
     class(wigner_value), intent(inout) :: p
     real(dp), intent(in) :: beta
     integer(i4b), intent(in) :: mmax,nmax
     integer(i4b) :: i
-    call p%delete()    
+    p%l = 0
+    p%beta = beta
+    call p%allocate(nmax,mmax)
+    p%v(p%ind(0,0)) = 1.0_dp
     return
   end subroutine initialise_wigner_value
 
+  
   subroutine next_wigner_value(p)
     implicit none
     class(wigner_value), intent(inout) :: p
-    integer(i4b) :: l,lold,m,n,mmax,nmax,i,mlim
-    real(dp) :: cb,cbh,sbh,fac1,fac2,fac3
+    integer(i4b) :: l,lm1,m,n,mmax,nmax,i,ip1
+    real(dp) :: beta,cb,cbh,sbh,fac1,fac2,fac3
 
-     
+    ! set local paramters
+    mmax = p%mmax
+    nmax = p%nmax
+    lm1 = p%l
+    l    = lm1 + 1
+    beta = p%beta
+    cb = cos(beta)    
+    cbh = cos(0.5_dp*beta)
+    sbh = sin(0.5_dp*beta)
 
+    ! apply three-term recursion
+    do m = 0,min(mmax,l-1)
+
+       
+       do n = -min(m,nmax),min(m,nmax)
+
+          ! get index
+          i = p%ind(n,m)
+
+          ! set factors
+          fac1 = cb-(n*m)/((l-1.0+dp)*l)
+          fac2 = (lm1**2-n**2)*(lm1**2-m**2)
+          fac2 = sqrt(fac2)/(lm1*(2.0_dp*l-1.0_dp))
+          fac3 = (l**2-n**2)*(l**2-m**2)
+          fac3 = sqrt(fac3)/(l*(2.0_dp*l-1.0_dp))
+          fac1 = fac1/fac3
+          fac2 = -fac2/fac3
+                    
+          ! update the values
+          if(m == l-1) then
+             p%vp1(i) = fac1*p%v(i)
+          else
+             p%vp1(i) = fac1*p%v(i) + fac2*p%vm1(i)
+          end if
+          
+       end do
+       
+    end do
 
     
     
+
+    if(l <= mmax) then
+
+       if(l <= nmax) then
+
+          ip1 = p%ind(-l,l)
+          i   = p%ind(-l+1,lm1)
+          fac1 = sbh**2
+          p%vp1(ip1) = fac1*p%v(i)
+          
+          do n = -l+1,l-1
+             ip1 = p%ind(n,l)
+             i   = p%ind(n,l-1)
+             fac1 = (2.0_dp*l-1.0_dp)*(2.0_dp*l)
+             fac2 = (l-n)*(l+n)
+             fac1 = sqrt(fac1/fac2)*cbh*sbh             
+             p%vp1(ip1) = fac1*p%v(i)
+          end do
+          
+          ip1 = p%ind(l,l)
+          i   = p%ind(l-1,l-1)
+          fac1 = cbh**2
+          p%vp1(ip1) = fac1*p%v(i)
+
+       else
+
+          do n = -nmax,nmax
+
+             ip1 = p%ind(n,l)
+             i   = p%ind(n,l-1)
+             fac1 = (2.0_dp*l-1.0_dp)*(2.0_dp*l)
+             fac2 = (l-n)*(l+n)
+             fac1 = sqrt(fac1/fac2)*cbh*sbh            
+             p%vp1(ip1) = fac1*p%v(i)
+             
+          end do
+          
+       end if
+
+       
+    end if
+
+    p%l = p%l+1
+    i = p%ind(min(l-1,nmax),min(l-1,mmax))
+    p%vm1(1:i) = p%v(1:i)
+    i = p%ind(min(l,nmax),min(l,mmax))
+    p%v(1:i) = p%vp1(1:i)
     
     return
   end subroutine next_wigner_value

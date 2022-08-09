@@ -9,33 +9,42 @@ program test
 
   
   integer(i4b) :: l,m,n,lmax,mmax,nmax
-  real(dp) :: th
-  type(legendre_value) :: p
+  real(dp) :: beta
 
-  lmax = 5
-  mmax = 5  
-  th = 0.3_dp
-  call p%init(th,mmax)
-  print *, p%deg(),p%get()
+  type(wigner_value) :: p
+
+  type(legendre_value) :: q
+  
+  lmax = 1000
+  nmax = 0
+  mmax = 5
+  beta = 0.2_dp
+  call p%init(beta,nmax,mmax)
+!  call p%init(beta,mmax)
+  print *, p%v(:)!*sifourpi
   do l = 1,lmax
      call p%next()
-     print *, p%deg(),p%get()     
+     print *, p%v(:)!*sqrt((2*l+1.0_dp)/fourpi)
+  end do
+
+  print *, '====================================='
+
+  call q%init(beta,mmax)
+  print *, q%v(:)
+  do l = 1,lmax
+     call q%next()
+     print *, q%v(:)
   end do
   
-  
-!  type(wigner_value) :: p
-  
+!  
+!  call p%init(beta,nmax,mmax)
 
-
-!  l = 5
-!  mmax = 3
-!  nmax = l
-!  call p%allocate(mmax,nmax)
-!  do n = 0,nmax
-!     do m = -min(mmax,n),min(n,mmax)
-!        print *, n,m, p%ind(m,n)
+!  do m = 0,mmax
+!     do n = -min(m,nmax),min(m,nmax)
+!        print *, m,n,p%ind(n,m)
 !     end do
 !  end do
+  
 
 
 
