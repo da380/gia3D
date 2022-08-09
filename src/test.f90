@@ -9,7 +9,7 @@ program test
 
   
   integer(i4b) :: l,m,n,lmax,mmax,nmax
-  real(dp) :: beta
+  real(dp) :: beta,start,finish
 
   type(wigner_value) :: p
 
@@ -17,33 +17,29 @@ program test
   
   lmax = 1000
   nmax = 0
-  mmax = 5
-  beta = 0.2_dp
+  mmax = lmax
+  beta = 0.3_dp
+  call cpu_time(start)
   call p%init(beta,nmax,mmax)
-!  call p%init(beta,mmax)
-  print *, p%v(:)!*sifourpi
+!  print *, p%v(p%ind(0,0))
   do l = 1,lmax
      call p%next()
-     print *, p%v(:)!*sqrt((2*l+1.0_dp)/fourpi)
+!     print *, p%v(p%ind(0,l))
   end do
+  call cpu_time(finish)
+  print *, finish-start
 
-  print *, '====================================='
-
+  call cpu_time(start)
   call q%init(beta,mmax)
-  print *, q%v(:)
+!  print *, p%v(p%ind(0,0))
   do l = 1,lmax
      call q%next()
-     print *, q%v(:)
+!     print *, p%v(p%ind(0,l))
   end do
-  
-!  
-!  call p%init(beta,nmax,mmax)
+  call cpu_time(finish)
+  print *, finish-start
 
-!  do m = 0,mmax
-!     do n = -min(m,nmax),min(m,nmax)
-!        print *, m,n,p%ind(n,m)
-!     end do
-!  end do
+
   
 
 

@@ -364,91 +364,50 @@ contains
     implicit none
     class(wigner_value), intent(inout) :: p
     integer(i4b) :: l,lm1,m,n,mmax,nmax,i,ip1
-    real(dp) :: beta,cb,cbh,sbh,fac1,fac2,fac3
+    real(dp) :: beta,cb,chb,shb,fac1,fac2,fac3,xl,xm,xn
 
     ! set local paramters
     mmax = p%mmax
     nmax = p%nmax
     lm1 = p%l
-    l    = lm1 + 1
+    l   = lm1 + 1
+    xl = l
     beta = p%beta
     cb = cos(beta)    
-    cbh = cos(0.5_dp*beta)
-    sbh = sin(0.5_dp*beta)
 
-    ! apply three-term recursion
-    do m = 0,min(mmax,l-1)
-
-       
-       do n = -min(m,nmax),min(m,nmax)
-
-          ! get index
-          i = p%ind(n,m)
-
-          ! set factors
-          fac1 = cb-(n*m)/((l-1.0+dp)*l)
-          fac2 = (lm1**2-n**2)*(lm1**2-m**2)
-          fac2 = sqrt(fac2)/(lm1*(2.0_dp*l-1.0_dp))
-          fac3 = (l**2-n**2)*(l**2-m**2)
-          fac3 = sqrt(fac3)/(l*(2.0_dp*l-1.0_dp))
-          fac1 = fac1/fac3
-          fac2 = -fac2/fac3
-                    
-          ! update the values
-          if(m == l-1) then
-             p%vp1(i) = fac1*p%v(i)
-          else
-             p%vp1(i) = fac1*p%v(i) + fac2*p%vm1(i)
-          end if
-          
+    if(l == 1) then
+       p%vp1(1) = cb       
+    else    
+       ! apply three-term recursion
+       do m = 0,min(mmax,l-1)
+          xm = m          
+          do n = -min(m,nmax),min(m,nmax)
+             xn = n          
+             i = p%ind(n,m)             
+             fac1 = (-1+2*xl)*(-xn*xm + (-1+xl)*xl*cb)
+             fac2 = xl*sqrt((-1- xn+xl)*(-1+xn+xl)*(-1-xm+ xl)*(-1+xm+xl))
+             fac3 = (-1+xl)*sqrt((-xn+xl)*(xn+xl)*(-xm+xl)*(xm+xl))
+             fac1 = -fac1/fac3
+             fac2 = -fac2/fac3
+             ! update values
+             p%vp1(i) = fac1*p%v(i) + fac2*p%vm1(i)             
+          end do
        end do
-       
-    end do
-
-    
-    
-
-    if(l <= mmax) then
-
-       if(l <= nmax) then
-
-          ip1 = p%ind(-l,l)
-          i   = p%ind(-l+1,lm1)
-          fac1 = sbh**2
-          p%vp1(ip1) = fac1*p%v(i)
-          
-          do n = -l+1,l-1
-             ip1 = p%ind(n,l)
-             i   = p%ind(n,l-1)
-             fac1 = (2.0_dp*l-1.0_dp)*(2.0_dp*l)
-             fac2 = (l-n)*(l+n)
-             fac1 = sqrt(fac1/fac2)*cbh*sbh             
-             p%vp1(ip1) = fac1*p%v(i)
-          end do
-          
-          ip1 = p%ind(l,l)
-          i   = p%ind(l-1,l-1)
-          fac1 = cbh**2
-          p%vp1(ip1) = fac1*p%v(i)
-
-       else
-
-          do n = -nmax,nmax
-
-             ip1 = p%ind(n,l)
-             i   = p%ind(n,l-1)
-             fac1 = (2.0_dp*l-1.0_dp)*(2.0_dp*l)
-             fac2 = (l-n)*(l+n)
-             fac1 = sqrt(fac1/fac2)*cbh*sbh            
-             p%vp1(ip1) = fac1*p%v(i)
-             
-          end do
-          
-       end if
-
-       
     end if
-
+    if(m <= mmax) then
+       ! set edge values directly
+       chb = log(cos(0.5_dp*beta))
+       shb = log(sin(0.5_dp*beta))
+       do n = -min(l,nmax),min(l,nmax)
+          xn = n
+          i = p%ind(n,l)                       
+          fac1 = 0.5_dp*(log_gamma(2*xl+1) -log_gamma(xl-xn+1) - log_gamma(xl+xn+1)) &
+                 +(l+n)*chb + (l-n)*shb
+          fac1 = exp(fac1)
+          if(modulo(l-n,2) /= 0) fac1 = -fac1
+          p%vp1(i) = fac1          
+       end do
+    end if
     p%l = p%l+1
     i = p%ind(min(l-1,nmax),min(l-1,mmax))
     p%vm1(1:i) = p%v(1:i)

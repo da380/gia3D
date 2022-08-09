@@ -183,10 +183,6 @@ contains
        self%a = -1.0_dp
        self%b =  1.0_dp
        mu = 2.0_dp
-    else if(poly == 'chebyshev') then
-       self%a = -1.0_dp
-       self%b =  1.0_dp
-       mu = pi
     else 
        call error(.true.,' set_gaussian_quadrature','polynomial not defined')       
     end if
@@ -196,9 +192,6 @@ contains
        if(poly == 'legendre') then          
           d(i) = 0.0_dp
           e(i) = sqrt(i*i/(4.0_dp*i*i-1.0_dp))
-       else if(poly == 'chebyshev') then
-          d(i) = 0.0_dp
-          e(i) = 0.5_dp
        end if       
     end do
 
