@@ -451,14 +451,16 @@ contains
 
 
   
-  function get_single_wigner_value(p,nin,min,flip) result(v)
+  function get_single_wigner_value(p,nin,min,norm,flip) result(v)
     implicit none
     class(wigner_value), intent(in) :: p
     integer(i4b), intent(in) :: nin,min
+    logical, intent(in), optional  :: norm
     logical, intent(in), optional  :: flip
     real(dp) :: v
     logical ::  check
-    integer(i4b) :: l,n,m,i,sign,mmax,nmax,j    
+    integer(i4b) :: l,n,m,i,sign,mmax,nmax,j
+    real(dp) :: fac
     call error(.not.p%allocated,'get_single_wigner_value','not allocated')
     l = p%l    
     ! transpose the indices if needed
@@ -505,16 +507,23 @@ contains
        if(modulo(n-m,2) /= 0) sign = -sign
     end if
     i = p%ind(n,m)
-    v = sign*p%v(i)
+    fac = 1.0_dp
+    if(present(norm)) then
+       if(norm) then
+          fac = sqrt((2*l+1)/fourpi)
+       end if       
+    end if
+    v = sign*fac*p%v(i)
     return
   end function get_single_wigner_value
 
   
-  function get_slice_wigner_value(p,n1,n2,m1,m2,flip) result(v)
+  function get_slice_wigner_value(p,n1,n2,m1,m2,norm,flip) result(v)
     implicit none
     class(wigner_value), intent(in) :: p
     integer(i4b), intent(in) :: n1,n2,m1,m2
     real(dp), dimension(n2-n1+1,m2-m1+1) :: v
+    logical, intent(in), optional :: norm
     logical, intent(in), optional :: flip
     integer(i4b) :: n,m,i,j
     i = 0
@@ -523,7 +532,7 @@ contains
        j = 0
        do m = m1,m2
           j = j+1
-          v(i,j) = p%get(n,m,flip)          
+          v(i,j) = p%get(n,m,norm,flip)          
        end do
     end do
     return

@@ -17,8 +17,8 @@ program test
   type(legendre_value) :: q
   
   l = 3
-  nmax = 1
-  mmax = l
+  nmax = l
+  mmax = 1
   beta = 0.2_dp
   call p%init(beta,nmax,mmax)  
   do lp = 0,l-1
