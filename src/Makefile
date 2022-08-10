@@ -18,7 +18,8 @@ MV=mv -f
 #####################################################
 #             list of excutable programs            #
 #####################################################
-SRCS = test.f90  test2.f90
+SRCS = test.f90 \
+       quadrature_test.f90
 
 
 ###########################################################
@@ -29,6 +30,7 @@ MOD_SRCS = module_constants.f90            \
 	   module_error.f90                \
            module_util.f90                 \
            module_interp.f90               \
+	   module_special_functions.f90    \
 	   module_quadrature.f90           \
            module_spherical_harmonics.f90  \
            module_spherical_model.f90
