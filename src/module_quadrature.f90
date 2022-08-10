@@ -199,10 +199,10 @@ contains
     implicit none    
     class(gauss_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    type(orthogonal_polynomial), intent(in) :: poly
-    call self%allocate(n)
-    self%a = poly%x1
-    self%b = poly%x2
+    class(orthogonal_polynomial), intent(in) :: poly
+    call self%allocate(n)    
+    self%a = poly%xl()
+    self%b = poly%xr()
     call build_gauss_quadrature(poly,n,self%x,self%w)
     return
   end subroutine set_gauss_quadrature
@@ -210,7 +210,7 @@ contains
   subroutine build_gauss_quadrature(poly,n,x,w)
     use module_special_functions
     implicit none
-    type(orthogonal_polynomial), intent(in) :: poly
+    class(orthogonal_polynomial), intent(in) :: poly
     integer(i4b), intent(in) :: n
     real(dp), dimension(n), intent(out) :: x,w
 
@@ -237,7 +237,7 @@ contains
                  m,x,z,n,isuppz,work,lwork,iwork,liwork,info)		
 
     ! get the weights
-    w = poly%mu*z(1,:)**2
+    w = poly%mu0()*z(1,:)**2
     
     return
   end subroutine build_gauss_quadrature
@@ -248,12 +248,12 @@ contains
     implicit none    
     class(gauss_radau_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    type(orthogonal_polynomial), intent(in) :: poly
+    class(orthogonal_polynomial), intent(in) :: poly
     logical, intent(in), optional :: right
     call error(n < 2,'set_gauss_radau_quadrature','order must be at least 2')
     call self%allocate(n)
-    self%a = poly%x1
-    self%b = poly%x2    
+    self%a = poly%xl()
+    self%b = poly%xr()    
     call build_gauss_radau_quadrature(poly,n-1,self%x,self%w,right)
     return
   end subroutine set_gauss_radau_quadrature
@@ -261,7 +261,7 @@ contains
   subroutine build_gauss_radau_quadrature(poly,n,x,w,right)
     use module_special_functions
     implicit none
-    type(orthogonal_polynomial), intent(in) :: poly
+    class(orthogonal_polynomial), intent(in) :: poly
     integer(i4b), intent(in) :: n
     real(dp), dimension(n+1), intent(out) :: x,w
     logical, intent(in), optional :: right
@@ -292,13 +292,13 @@ contains
     end if
 
     ! set up the linear system to be solved
-    if(do_right) then
-       d(1:n)   = poly%x2-alpha(1:n)
+    if(do_right) then       
+       d(1:n)   = poly%xr()-alpha(1:n)
        e(1:n-1) = -beta(1:n-1)
        b = 0.0_dp
        b(n,1) = -beta(n)**2
     else
-       d(1:n)   = alpha(1:n)-poly%x1
+       d(1:n)   = alpha(1:n)-poly%xl()
        e(1:n-1) = beta(1:n-1)
        b = 0.0_dp
        b(n,1) = beta(n)**2
@@ -310,9 +310,9 @@ contains
     ! set up the matrix for the eigenvalue problem
     d(1:n) = alpha
     if(do_right) then
-       d(n+1) = poly%x2 + b(n,1)
+       d(n+1) = poly%xr() + b(n,1)
     else
-       d(n+1) = poly%x1 + b(n,1)
+       d(n+1) = poly%xl() + b(n,1)
     end if
     e(1:n) = beta
     e(n+1) = 0.0_dp
@@ -324,7 +324,7 @@ contains
                  m,x,z,n+1,isuppz,work,lwork,iwork,liwork,info)		
 
     ! get the weights
-    w = poly%mu*z(1,:)**2
+    w = poly%mu0()*z(1,:)**2
     
     return
   end subroutine build_gauss_radau_quadrature
@@ -335,11 +335,11 @@ contains
     implicit none    
     class(gauss_lobatto_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    type(orthogonal_polynomial), intent(in) :: poly
+    class(orthogonal_polynomial), intent(in) :: poly
     call error(n < 2,'set_gauss_lobatto_quadrature','order must be at least 2')
     call self%allocate(n)
-    self%a = poly%x1
-    self%b = poly%x2    
+    self%a = poly%xl()
+    self%b = poly%xr()  
     call build_gauss_lobatto_quadrature(poly,n-1,self%x,self%w)
     return
   end subroutine set_gauss_lobatto_quadrature
@@ -349,7 +349,7 @@ contains
   subroutine build_gauss_lobatto_quadrature(poly,n,x,w)
     use module_special_functions
     implicit none
-    type(orthogonal_polynomial), intent(in) :: poly
+    class(orthogonal_polynomial), intent(in) :: poly
     integer(i4b), intent(in) :: n
     real(dp), dimension(n+1), intent(out) :: x,w
 
@@ -365,9 +365,9 @@ contains
     real(dp), dimension(n+1,n+1) :: z
 
     ! get end points
-    x1 = poly%x1
-    x2 = poly%x2
-    mu0 = poly%mu
+    x1 = poly%xl()
+    x2 = poly%xr()
+    mu0 = poly%mu0()
     
     ! set up the matrix
     do i = 1,n

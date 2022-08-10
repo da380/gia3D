@@ -6,24 +6,22 @@ program quadrature_test
   use module_quadrature
   implicit none
 
-  integer(i4b), parameter :: n = 7
-  type(orthogonal_polynomial) :: poly
+  integer(i4b), parameter :: n = 5
+  class(orthogonal_polynomial), allocatable :: poly
   type(gauss_quadrature) :: quad1
   type(gauss_radau_quadrature) :: quad2
-  type(gauss_lobatto_quadrature) :: quad3
-  
+  type(gauss_lobatto_quadrature) :: quad3   
 
-  call set_legendre_polynomial(poly)
-
+  ! set the polynomial type
+  poly = legendre()
 
   print *, '===================================='
-
   print *, 'Gauss quadrature'
   
-  call quad1%set(n,poly)
+  call quad1%set(n,poly)   
   print *, quad1%points()
   print *, quad1%weights()
-
+  
   print *, '===================================='
 
   print *, 'Gauss-Radau quadrature (left endpoint)'
