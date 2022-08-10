@@ -11,17 +11,17 @@ program test
   real(dp), dimension(:,:), allocatable :: d
   
   type(wigner_value) :: p
-
   type(legendre_value) :: q
   
-  l = 3
-  nmax = l
-  mmax = 1
-  beta = 0.2_dp
+  lmax = 3
+  nmax = lmax
+  mmax = lmax
+  beta = pio4
   call p%init(beta,nmax,mmax)  
-  do lp = 0,l-1
+  do l = 0,lmax-1
      call p%next()
   end do
+
 
 
   allocate(d(2*nmax+1,2*mmax+1))

@@ -448,7 +448,6 @@ contains
   end function degree_wigner_value
 
 
-
   
   function get_single_wigner_value(p,nin,min,norm,flip) result(v)
     implicit none
