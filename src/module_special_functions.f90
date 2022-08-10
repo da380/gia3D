@@ -11,7 +11,7 @@ module module_special_functions
      !
      ! This relation has the form used in Goulb and Welsch:
      !
-     ! p_{j} = (a_{j} + b_{j})p_{j-1} - c_{j}p_{j-1}
+     ! p_{j} = (a_{j}x + b_{j})p_{j-1} - c_{j}p_{j-1}
      !
      ! with p_{-1} = 0, p_{0} = 1
      !
@@ -102,7 +102,7 @@ contains
     pm1 = 0.0_dp
     p   = 1.0_dp
     do i = 1,n
-       pp1 = (poly%a(i)+poly%b(i))*x*p - poly%c(i)*pm1
+       pp1 = (poly%a(i)*x+poly%b(i))*p - poly%c(i)*pm1
        pm1 = p
        p = pp1       
     end do
