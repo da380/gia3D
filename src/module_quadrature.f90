@@ -411,10 +411,5 @@ contains
     return
   end subroutine build_gauss_lobatto_quadrature
 
-
-
- 
-  
->>>>>>> quad_work
   
 end module module_quadrature
