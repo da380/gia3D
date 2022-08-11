@@ -6,10 +6,17 @@ LOBJ=../obj/
 BIN=../bin/
 VPATH = $(BIN):$(LOBJ)
 
-# set the compiler and flags
+# set the compiler 
 F95 = gfortran
-FFLAGS =   -I../mod  -J../mod  -O5 -fbounds-check
-LIBS =  -l lapack
+
+# fftw3 f90 location
+FFTW3 = /home/david/lib/fftw-3.3.3/api
+
+# set the flags
+FFLAGS =   -I../mod  -J../mod  -O5 -fbounds-check  -I$(FFTW3)
+
+# libraries to link to
+LIBS =  -l lapack -lfftw3
 
 # set some parameters
 MV=mv -f
@@ -19,7 +26,8 @@ MV=mv -f
 #             list of excutable programs            #
 #####################################################
 SRCS = test_special_functions.f90 \
-       test_quadrature.f90      
+       test_quadrature.f90        \
+       test_fftw3.f90  
 
 
 ###########################################################
@@ -29,11 +37,12 @@ MOD_SRCS = module_constants.f90            \
            module_physical_constants.f90   \
 	   module_error.f90                \
            module_util.f90                 \
+	   module_fftw3.f90                \
            module_interp.f90               \
 	   module_special_functions.f90    \
 	   module_quadrature.f90           \
            module_spherical_harmonics.f90  \
-           module_spherical_model.f90
+           module_spherical_model.f90      
 
 
 ###########################################################
