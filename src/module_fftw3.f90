@@ -23,10 +23,6 @@ contains
     !
     ! Variables:
     !
-    ! forward -- logical. Equals .true. for a forward transformation
-    !                     (meaning + sign in exponent) or .false.
-    !                     for a backward transformation.
-    !
     ! n       -- integer. Number of sample points. This does not need
     !                     to be a power of 2, but the routines are
     !                     fastest if it is.
@@ -80,10 +76,6 @@ contains
     ! a  real scalar using FFTW3.
     !
     ! Variables:
-    !
-    ! forward -- logical. Equals .true. for a forward transformation
-    !                     (meaning + sign in exponent) or .false.
-    !                     for a backward transformation.
     !
     ! n       -- integer. Number of sample points. This does not need
     !                     to be a power of 2, but the routines are
@@ -147,10 +139,6 @@ contains
     !
     ! Variables:
     !
-    ! forward -- logical. Equals .true. for a forward transformation
-    !                     (meaning + sign in exponent) or .false.
-    !                     for a backward transformation.
-    !
     ! n       -- integer. Number of sample points. This does not need
     !                     to be a power of 2, but the routines are
     !                     fastest if it is.
@@ -204,10 +192,6 @@ contains
     ! a  real vector using FFTW3.
     !
     ! Variables:
-    !
-    ! forward -- logical. Equals .true. for a forward transformation
-    !                     (meaning + sign in exponent) or .false.
-    !                     for a backward transformation.
     !
     ! n       -- integer. Number of sample points. This does not need
     !                     to be a power of 2, but the routines are
