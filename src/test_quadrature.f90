@@ -15,6 +15,7 @@ program quadrature_test
   ! set the polynomial type
   poly = legendre()
 
+
   print *, '===================================='
   print *, 'Gauss quadrature'
   

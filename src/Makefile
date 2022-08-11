@@ -18,8 +18,8 @@ MV=mv -f
 #####################################################
 #             list of excutable programs            #
 #####################################################
-SRCS = test.f90 \
-       quadrature_test.f90
+SRCS = test_special_functions.f90 \
+       test_quadrature.f90      
 
 
 ###########################################################

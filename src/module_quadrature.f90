@@ -367,6 +367,8 @@ contains
     ! get end points
     x1 = poly%xl()
     x2 = poly%xr()
+
+    ! first moment
     mu0 = poly%mu0()
     
     ! set up the matrix
@@ -396,10 +398,7 @@ contains
     d(1:n) = alpha
     e(1:n-1) = beta(1:n-1)
     e(n)   = sqrt((x2-x1)/(gamma-mu))
-    d(n+1) = x1 + gamma*e(n)**2
-
-       
-    ! solve the eigenvalue problem
+    d(n+1) = x1 + gamma*e(n)**2      
     lwork  = 18*(n+1)
     liwork = 10*(n+1)
     call dstegr('V','A',n+1,d,e,vl,vu,il,iu,abstol, &
