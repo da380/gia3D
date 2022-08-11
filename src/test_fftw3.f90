@@ -3,101 +3,52 @@ program fftw3_test
   use module_constants
   use module_fftw3
   implicit none
-
-  integer(i4b), parameter :: n = 256, m = 3
-  integer(i4b) :: i,j
-  integer(i4b) :: rank = 1
-  integer(i4b), dimension(1) :: nn 
-  integer(i4b) :: howmany = m
-  integer(i4b) :: idist = 1,odist = 1
-  integer(i4b) :: istride = m,ostride = m
-  integer(i4b), dimension(1) :: inembed,onembed
-
-  complex(C_DOUBLE_COMPLEX), pointer :: in(:,:),out(:,:),rec(:,:)
-  type(C_PTR) :: pin,pout,prec
-  type(C_PTR) :: plan
   
-  nn(1) = n
-  inembed = nn
-  onembed = nn
-  
-  ! allocate the arrays
-  pin  = fftw_alloc_complex(int(n*m, C_SIZE_T))
-  pout = fftw_alloc_complex(int(n*m, C_SIZE_T))
-  prec = fftw_alloc_complex(int(n*m, C_SIZE_T))
-  call c_f_pointer(pin, in, [n,m])
-  call c_f_pointer(pout, out, [n,m])
-  call c_f_pointer(prec, rec, [n,m])
+  integer, parameter :: n = 8, m = 2
+  integer :: i
+  real(dp) :: x,start,finish
+  real(dp), dimension(n) :: inr,recr
+  real(dp), dimension(n,m) :: invr,recvr
+  complex(dpc), dimension(n/2+1) :: outr
+  complex(dpc), dimension(n/2+1,m) :: outvr
+  complex(dpc), dimension(n) :: in,out,rec
+  complex(dpc), dimension(n,m) :: inv,outv,recv
 
-
-  ! set the forward array
-  do i = 1,n
-     do j = 1,m
-        in(i,j) = cos(3*2*pi*(i+j)/n)        
-     end do     
-  end do
-
-
-  ! make the forward plan
-  plan =  fftw_plan_many_dft(rank, nn,  howmany,   &
-                             in, inembed, istride, & 
-			     idist, out, onembed,  & 
-			     ostride, odist, FFTW_FORWARD, FFTW_ESTIMATE)
-  
-
-  ! exucute the plan
-  call fftw_execute_dft(plan,in,out)
-
-
-
-  ! make the backwards plan
-  plan =  fftw_plan_many_dft(rank, nn,  howmany,   &
-                             out, inembed, istride, & 
-			     idist, rec, onembed,  & 
-			     ostride, odist, FFTW_BACKWARD, FFTW_ESTIMATE)
-
-  ! exucute the plan
-  call fftw_execute_dft(plan,out,rec)
-
-
-
-  open(99,file='fftw_test.out')
 
   do i = 1,n
-     write(99,*) i,real(in(i,:)),real(in(i,:))-real(rec(i,:))/n
+     x = (i-1)*pi/n
+     in(i) = sin(5*x)
+     inv(i,:) = in(i)
   end do
   
-  close(99)
+  print *, real(in)  
+  call dft_1D (.true., n,  in, out)
+  call dft_1D(.false., n, out, rec)
+  print *, real(rec/n)
+  print *, '============================================'
+
   
-!  integer, parameter :: n = 4
-!  integer :: i
-!  type(C_PTR) :: plan
-!  complex(C_DOUBLE_COMPLEX), pointer :: in(:),out(:)
-!  type(C_PTR) :: pin,pout
+  print *, real(inv(:,1))  
+  call dft_1D( .true., n, m,  inv, outv)
+  call dft_1D(.false., n, m, outv, recv)  
+  print *, real(recv(:,1)/n)
+  print *, '============================================'
 
 
-!  pin  = fftw_alloc_complex(int(n, C_SIZE_T))
-!  pout = fftw_alloc_complex(int(n, C_SIZE_T))
-!  call c_f_pointer(pin, in, [n])
-!  call c_f_pointer(pout, out, [n])
-!  plan = fftw_plan_dft_1d(n, in, out, FFTW_FORWARD, FFTW_ESTIMATE)
+  inr = real(in)
+  print *, inr
+  call dft_1D(n,inr,outr)
+  call dft_1D(n,outr,recr)
+  print *, recr/n
+  print *, '============================================'
 
-
-!  do i = 1,n
-!     in(i) = sin(pi*i)
-!  end do
-
-!  print *, real(in)
-
-!  call fftw_execute_dft(plan, in, out)
-
-
-!  plan = fftw_plan_dft_1d(n, out, in, FFTW_BACKWARD, FFTW_ESTIMATE)
-
-!  call fftw_execute_dft(plan, out, in)
-
-!  print *, real(in/n)
-  
-  
+  do i = 1,m
+     invr(:,i) = inr
+  end do
+  print *, invr(:,1)
+  call dft_1D(n,m,invr,outvr)
+  call dft_1D(n,m,outvr,recvr)
+  print *, recvr(:,1)/n
+  print *, '============================================'
   
 end program fftw3_test
