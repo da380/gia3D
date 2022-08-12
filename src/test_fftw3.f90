@@ -14,7 +14,19 @@ program fftw3_test
   complex(dpc), dimension(n) :: in,out,rec
   complex(dpc), dimension(n,m) :: inv,outv,recv
 
+  type(C_PTR) :: plan
+  complex(C_DOUBLE_COMPLEX), pointer :: lin(:),lout(:)
+  type(C_PTR) :: pin,pout
+  
+  pin  = fftw_alloc_complex(int(n, C_SIZE_T))
+  pout = fftw_alloc_complex(int(n, C_SIZE_T))
+  call c_f_pointer(pin,   lin, [n])
+  call c_f_pointer(pout, lout, [n]) 
+  plan  = fftw_plan_dft_1d(n, lin, lout, FFTW_FORWARD, FFTW_ESTIMATE)
+  plan  = fftw_plan_dft_1d(n, lin, lout, FFTW_FORWARD, FFTW_ESTIMATE)
 
+  stop
+  
   do i = 1,n
      x = (i-1)*pi/n
      in(i) = sin(5*x)

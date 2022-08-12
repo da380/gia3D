@@ -17,6 +17,8 @@ module module_fftw3
 
 contains
 
+  
+  
   subroutine dft_real_scalar_1D_forward(n,in,out)
     ! simple driver routine for performing an FFT of
     ! a  real scalar using FFTW3.
@@ -52,7 +54,7 @@ contains
     ! copy the input data
     lin = in
 
-    ! make the plan
+    ! make the plan   
     plan = fftw_plan_dft_r2c_1d(n,lin,lout,FFTW_ESTIMATE);
 
     ! do the transform

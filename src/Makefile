@@ -25,10 +25,11 @@ MV=mv -f
 #####################################################
 #             list of excutable programs            #
 #####################################################
-SRCS = test_special_functions.f90 \
-       test_quadrature.f90        \
-       test_fftw3.f90             \
-       test_spherical_harmonics.f90
+SRCS = test_special_functions.f90    \
+       test_quadrature.f90           \
+       test_fftw3.f90                \
+       test_spherical_harmonics.f90  \
+       test_wigner.f90
 
 
 ###########################################################

@@ -105,6 +105,7 @@ module module_special_functions
      private
      logical :: allocated = .false.
      logical :: transposed = .false.
+     logical :: frozen = .false.
      integer(i4b) :: l
      integer(i4b) :: nmax
      integer(i4b) :: mmax
@@ -118,6 +119,7 @@ module module_special_functions
      procedure :: ind => index_wigner_value
      procedure :: init => initialise_wigner_value
      procedure :: next => next_wigner_value
+     procedure :: freeze => freeze_wigner_value
      procedure :: deg => degree_wigner_value
      procedure :: get_single_wigner_value
      procedure :: get_slice_wigner_value
@@ -518,7 +520,10 @@ contains
     pdim = (p%nmax+1)**2 + (p%mmax-p%nmax)*(2*p%nmax+1)
     allocate(p%vm1(pdim))
     allocate(p%v(pdim))
-    allocate(p%vp1(pdim))    
+    allocate(p%vp1(pdim))
+    p%vm1 = 0.0_dp
+    p%v   = 0.0_dp
+    p%vp1 = 0.0_dp
     p%allocated = .true.
     return
   end subroutine allocate_wigner_value
@@ -554,8 +559,9 @@ contains
     implicit none
     class(wigner_value), intent(inout) :: p
     integer(i4b) :: l,m,n,mmax,nmax,i,ip1,j,nm
-    real(dp) :: beta,cb,chb,shb,fac1,fac2,fac3,xl,xm,xn,tlm1,lm1
+    real(dp) :: beta,cb,chb,shb,fac1,fac2,fac3,xl,xm,xn
     ! set local paramters
+    call error(p%frozen,'next_wigner_value','value frozen')
     mmax = p%mmax
     nmax = p%nmax
     l = p%l +1
@@ -564,8 +570,6 @@ contains
        p%l = l
        return
     end if
-    lm1 = l-1
-    tlm1 = 2*l-1
     xl = l
     beta = p%beta
     cb = cos(beta)    
@@ -582,11 +586,11 @@ contains
           do n = -nm,nm
              xn = n                 
              i = i+1
-             fac1 = tlm1*(-n*m+lm1*l*cb)
-             fac2 = (lm1-n)*(lm1+n)*(lm1-m)*(lm1+m)
-             fac2 = -l*sqrt(fac2)
-             fac3 = (-n+l)*(n+l)*(-m+l)*(m+l)
-             fac3 = lm1*sqrt(fac3)
+             fac1 = (2*xl-1)*(-xn*xm+(xl-1)*xl*cb)
+             fac2 = (xl-1-xn)*(xl-1+xn)*(xl-1-xm)*(xl-1+xm)
+             fac2 = -xl*sqrt(fac2)
+             fac3 = (-xn+xl)*(xn+xl)*(-xm+xl)*(xm+xl)
+             fac3 = (xl-1)*sqrt(fac3)
              fac1 = fac1/fac3
              fac2 = fac2/fac3
              ! update values
@@ -640,6 +644,15 @@ contains
     return
   end subroutine next_wigner_value
 
+
+  subroutine freeze_wigner_value(p)
+    implicit none
+    class(wigner_value), intent(inout) :: p
+    call error(.not.p%allocated,'freeze_wigner_value','value not allocated')
+    deallocate(p%vm1,p%vp1)
+    return
+  end subroutine freeze_wigner_value
+  
   function degree_wigner_value(p) result(l)
     implicit none
     class(wigner_value), intent(in) :: p
