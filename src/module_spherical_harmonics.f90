@@ -13,7 +13,7 @@ module module_spherical_harmonics
      integer(i4b) :: lmax
      integer(i4b) :: nth
      integer(i4b) :: nph
-     integer(i4b) :: nxlm 
+     integer(i4b) :: nlegendre 
      real(dp) :: dph
      real(dp), dimension(:), allocatable :: th
      real(dp), dimension(:), allocatable :: w
@@ -21,7 +21,7 @@ module module_spherical_harmonics
      procedure :: delete => delete_gauss_legendre_grid
      procedure :: build =>  build_gauss_legendre_grid
      procedure :: ph    =>  ph_gauss_legednre_grid
-     procedure :: build_xlm => build_xlm_gauss_legendre_grid
+     procedure :: build_legendre => build_legendre_gauss_legendre_grid
   end type gauss_legendre_grid
 
   type, extends(gauss_legendre_grid) :: scalar_gauss_legendre_grid
@@ -68,7 +68,7 @@ contains
     grid%dph = twopi/grid%nph
     allocate(grid%th(lmax+1))
     allocate(grid%w(lmax+1))
-    grid%nxlm = lmax*(lmax+1)/2 + lmax + 1
+    grid%nlegendre = lmax*(lmax+1)/2 + lmax + 1
     poly = legendre()
     call quad%set(lmax+1,poly)
     grid%th = acos(quad%points())
@@ -87,7 +87,7 @@ contains
   end function ph_gauss_legednre_grid
   
 
-  function build_xlm_gauss_legendre_grid(grid) result(xlm)
+  function build_legendre_gauss_legendre_grid(grid) result(xlm)
     use module_special_functions
     implicit none
     class(gauss_legendre_grid), intent(in) :: grid
@@ -97,7 +97,7 @@ contains
     type(legendre_value) :: p    
     lmax = grid%lmax
     nth = grid%nth
-    ndim = grid%nxlm
+    ndim = grid%nlegendre
     allocate(xlm(ndim,nth))
     do ith = 1,nth
        th = grid%th(ith)
@@ -112,7 +112,7 @@ contains
        end do
     end do
     return
-  end function build_xlm_gauss_legendre_grid
+  end function build_legendre_gauss_legendre_grid
 
 
 
@@ -193,7 +193,7 @@ contains
     implicit none    
     class(scalar_gauss_legendre_grid), intent(in) :: u
     type(C_PTR), intent(in) :: plan
-    real(dp), dimension(u%nxlm,u%nth), intent(in) :: xlm    
+    real(dp), dimension(u%nlegendre,u%nth), intent(in) :: xlm    
     complex(dpc), dimension(:), intent(out) :: ulm
 
     integer(i4b) :: n,ith,l,lmax,m,ilm,im,ix,sign,nth,nph

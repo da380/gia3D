@@ -32,7 +32,7 @@ program test_spherical_harmonics
   end do
 
   ! precompute the Legendre polynomial values
-  xlm = u%build_xlm()
+  xlm = u%build_legendre()
 
   
   ! allocate the coefficient array
