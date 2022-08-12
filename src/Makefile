@@ -27,7 +27,8 @@ MV=mv -f
 #####################################################
 SRCS = test_special_functions.f90 \
        test_quadrature.f90        \
-       test_fftw3.f90  
+       test_fftw3.f90             \
+       test_spherical_harmonics.f90
 
 
 ###########################################################
@@ -61,7 +62,7 @@ BINEXCT     = $(EXCT:%=$(BIN)%)
 all: $(EXCT)
 
 $(EXCT): %:  $(MOD_OBJS)  %.o
-	$(F95) $(FFLAGS) $^ $(LIBS) -o $(BIN)$@
+	$(F95) $(FFLAGS)  $^  $(LIBS) -o $(BIN)$@
 
 $(OBJS): $(LOBJ)%.o: %.f90 
 	$(F95) $(FFLAGS) $^  -c

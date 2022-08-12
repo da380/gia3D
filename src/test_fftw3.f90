@@ -4,7 +4,7 @@ program fftw3_test
   use module_fftw3
   implicit none
   
-  integer, parameter :: n = 8, m = 2
+  integer, parameter :: n = 2**3, m = 2
   integer :: i
   real(dp) :: x,start,finish
   real(dp), dimension(n) :: inr,recr
@@ -21,11 +21,12 @@ program fftw3_test
      inv(i,:) = in(i)
   end do
   
-  print *, real(in)  
+  print *, real(in)
   call dft_1D (.true., n,  in, out)
   call dft_1D(.false., n, out, rec)
   print *, real(rec/n)
   print *, '============================================'
+
 
   
   print *, real(inv(:,1))  

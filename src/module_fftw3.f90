@@ -280,14 +280,13 @@ contains
     complex(C_DOUBLE_COMPLEX), pointer :: lin(:),lout(:)
     type(C_PTR) :: pin,pout
 
+    
     ! set up the C pointers
     pin  = fftw_alloc_complex(int(n, C_SIZE_T))
     pout = fftw_alloc_complex(int(n, C_SIZE_T))
     call c_f_pointer(pin,   lin, [n])
     call c_f_pointer(pout, lout, [n])
 
-    ! copy over the input data
-    lin  = in
 
     ! make the plan
     if(forward) then
@@ -296,9 +295,12 @@ contains
        plan = fftw_plan_dft_1d(n, lin, lout, FFTW_BACKWARD, FFTW_ESTIMATE)
     end if
 
+    ! copy over the input data
+    lin  = in 
+    
     ! do the transform
     call fftw_execute_dft(plan, lin, lout)
-
+    
     ! copy the result
     out = lout
 

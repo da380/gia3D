@@ -6,7 +6,7 @@ program quadrature_test
   use module_quadrature
   implicit none
 
-  integer(i4b), parameter :: n = 5
+  integer(i4b), parameter :: n = 2**2+1
   class(orthogonal_polynomial), allocatable :: poly
   type(gauss_quadrature) :: quad1
   type(gauss_radau_quadrature) :: quad2
