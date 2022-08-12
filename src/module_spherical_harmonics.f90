@@ -3,36 +3,31 @@ module module_spherical_harmonics
   use module_constants
   use module_error
 
-  type, abstract:: spherical_grid
-
-  end type spherical_grid
-  
 
   type gauss_legendre_grid
      logical :: allocated = .false.
      integer(i4b) :: lmax
      integer(i4b) :: nth
      integer(i4b) :: nph
-     integer(i4b) :: nlegendre 
+     integer(i4b) :: nplm
      real(dp) :: dph
      real(dp), dimension(:), allocatable :: th
      real(dp), dimension(:), allocatable :: w
    contains
      procedure :: delete => delete_gauss_legendre_grid
      procedure :: build =>  build_gauss_legendre_grid
+     procedure :: precompute_legendre 
      procedure :: ph    =>  ph_gauss_legednre_grid
-     procedure :: build_legendre => build_legendre_gauss_legendre_grid
   end type gauss_legendre_grid
 
   type, extends(gauss_legendre_grid) :: scalar_gauss_legendre_grid
+     integer(i4b) :: ncoef
      complex(dpc), dimension(:,:), allocatable :: val
    contains
      procedure :: delete => delete_scalar_gauss_legendre_grid
      procedure :: build => build_scalar_gauss_legendre_grid
      procedure :: plan => plan_scalar_gauss_legendre_grid
-  end type scalar_gauss_legendre_grid
-
-  
+  end type scalar_gauss_legendre_grid 
 
 
 
@@ -68,7 +63,6 @@ contains
     grid%dph = twopi/grid%nph
     allocate(grid%th(lmax+1))
     allocate(grid%w(lmax+1))
-    grid%nlegendre = lmax*(lmax+1)/2 + lmax + 1
     poly = legendre()
     call quad%set(lmax+1,poly)
     grid%th = acos(quad%points())
@@ -87,7 +81,8 @@ contains
   end function ph_gauss_legednre_grid
   
 
-  function build_legendre_gauss_legendre_grid(grid) result(xlm)
+
+  function precompute_legendre(grid) result(xlm)
     use module_special_functions
     implicit none
     class(gauss_legendre_grid), intent(in) :: grid
@@ -97,14 +92,13 @@ contains
     type(legendre_value) :: p    
     lmax = grid%lmax
     nth = grid%nth
-    ndim = grid%nlegendre
+    ndim = grid%nplm
     allocate(xlm(ndim,nth))
     do ith = 1,nth
        th = grid%th(ith)
        call p%init(th,lmax)
-       xlm(1,ith) = p%get(0)
-       i1 = 2       
-       do l = 1,lmax
+       i1 = 1       
+       do l = 0,lmax
           i2 = i1+l          
           call p%next()
           xlm(i1:i2,ith) = p%get(0,l)
@@ -112,9 +106,9 @@ contains
        end do
     end do
     return
-  end function build_legendre_gauss_legendre_grid
+  end function precompute_legendre
 
-
+  
 
   !=======================================================================!
   !                 procedures for complex scalar fields                  !
@@ -137,12 +131,16 @@ contains
     integer(i4b), intent(in) :: lmax
     call grid%delete()
     call grid%gauss_legendre_grid%build(lmax)
+    grid%ncoef = (lmax+1)**2
+    grid%nplm = lmax*(lmax+1)/2 + lmax + 1
     allocate(grid%val(grid%nph,grid%nth))
-    grid%val = 0.0_dp
+    grid%val = 0.0_dp    
     grid%allocated = .true.
     return
   end subroutine build_scalar_gauss_legendre_grid
 
+
+  
   
   function plan_scalar_gauss_legendre_grid(u,forward,flag) result(plan)
     use module_fftw3
@@ -187,52 +185,53 @@ contains
     return
   end function plan_scalar_gauss_legendre_grid
 
-  subroutine trans_scalar_gauss_legendre_grid(u,plan,xlm,ulm)
+  
+
+ subroutine trans_scalar_gauss_legendre_grid(u,plan,xlm,ulm)
     use module_fftw3
     use module_special_functions
     implicit none    
     class(scalar_gauss_legendre_grid), intent(in) :: u
     type(C_PTR), intent(in) :: plan
-    real(dp), dimension(u%nlegendre,u%nth), intent(in) :: xlm    
+    real(dp), dimension(u%nplm,u%nth), intent(in) :: xlm    
     complex(dpc), dimension(:), intent(out) :: ulm
 
-    integer(i4b) :: n,ith,l,lmax,m,ilm,im,ix,sign,nth,nph
+    integer(i4b) :: n,ith,l,m,ilm,im,ix,sign
     real(dp) :: fac
     complex(C_DOUBLE_COMPLEX), pointer :: in(:),out(:)
     type(C_PTR) :: pin,pout
-
-    nth  = u%nth
-    nph  = u%nph
-    lmax = u%lmax
-
-    fac = twopi/nph
      
     ! set up the C pointers
-    n = u%nph
-    pin   = fftw_alloc_complex(int(n, C_SIZE_T))
-    pout  = fftw_alloc_complex(int(n, C_SIZE_T))
-    call c_f_pointer(pin,   in, [n])
-    call c_f_pointer(pout,  out, [n])
+    pin   = fftw_alloc_complex(int(u%nph, C_SIZE_T))
+    pout  = fftw_alloc_complex(int(u%nph, C_SIZE_T))
+    call c_f_pointer(pin,   in, [u%nph])
+    call c_f_pointer(pout,  out, [u%nph])
 
+
+
+    
     ! initialise the coefficients
     ulm = 0.0_dp
+
     
     ! loop over colatitude
     do ith = 1,u%nth
 
+
        ! transform the ith column
        in = u%val(:,ith)
        call fftw_execute_dft(plan, in, out)
-
+       
        ilm = 0
        ix = 0
-       do l = 0,lmax
+       do l = 0,u%lmax
 
           ! deal with m = 0
           ilm = ilm+1
           im  = 1
           ix = ix+1
           ulm(ilm) = ulm(ilm) + out(im)*xlm(ix,ith)*u%w(ith)
+
 
           ! deal with m /= 0
           sign = 1
@@ -249,6 +248,7 @@ contains
              im = -m+u%nph+1
              sign = -sign
              ulm(ilm) = ulm(ilm) + sign*out(im)*xlm(ix,ith)*u%w(ith)
+
                           
           end do
           
@@ -256,17 +256,20 @@ contains
        
     end do
 
-    ulm = fac*ulm
+
+    ulm = (twopi/u%nph)*ulm
 
 
     call fftw_free(pin)
     call fftw_free(pout)
-    in  => null()
+    in  => null() 
     out => null()
+
+
     
     return
   end subroutine trans_scalar_gauss_legendre_grid
-  
+
 
 
 

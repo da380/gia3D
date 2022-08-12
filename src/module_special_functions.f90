@@ -378,11 +378,10 @@ contains
     real(dp), intent(in) :: th
     integer(i4b), intent(in) :: mmax
     call p%delete()    
-    p%l  = 0
+    p%l  = -1
     p%th = th
     p%mmax = mmax
     call p%allocate(mmax)       
-    p%v(0) = sifourpi
     return
   end subroutine initialise_legendre_value
 
@@ -395,6 +394,11 @@ contains
     ! get local parameters
     lold = p%l
     l = lold+1
+    if(l == 0) then
+       p%v(0) = sifourpi
+       p%l = l
+       return
+    end if
     th = p%th
     ct = cos(th)
     st = sin(th)
@@ -539,10 +543,9 @@ contains
     real(dp), intent(in) :: beta
     integer(i4b), intent(in) :: mmax,nmax
     integer(i4b) :: i
-    p%l = 0
+    p%l = -1
     p%beta = beta
     call p%allocate(nmax,mmax)
-    p%v(1) = 1.0_dp
     return
   end subroutine initialise_wigner_value
 
@@ -556,6 +559,11 @@ contains
     mmax = p%mmax
     nmax = p%nmax
     l = p%l +1
+    if(l == 0) then
+       p%v(1) = 1.0_dp
+       p%l = l
+       return
+    end if
     lm1 = l-1
     tlm1 = 2*l-1
     xl = l
