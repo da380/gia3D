@@ -28,23 +28,58 @@ module module_spherical_harmonics
 
 
   type spherical_harmonic_coefficient
+     private
      logical :: allocated
      integer(i4b) :: lmax
      integer(i4b) :: nmax
      integer(i4b) :: ndim
      complex(dpc), dimension(:), allocatable :: data
+     real(dp) :: s = 0.0_dp
+     real(dp) :: mu = 1.0_dp
    contains
      procedure :: delete    => delete_spherical_harmonic_coefficient
      procedure :: allocate  => allocate_spherical_harmonic_coefficient
+     procedure :: set_sobolev => set_sobolev_spherical_harmonic_coefficient
      procedure :: index     => index_spherical_harmonic_coefficient
      procedure :: get       => get_spherical_harmonic_coefficient
      procedure :: mslice    => mslice_spherical_harmonic_coefficient
      procedure :: nslice    => nslice_spherical_harmonic_coefficient
      procedure :: nmslice   => nmslice_spherical_harmonic_coefficient
+     procedure, pass(u) :: complex_left_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: complex_right_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: real_left_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: real_right_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: real_sp_left_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: real_sp_right_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: int_left_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: int_right_multiply_spherical_harmonic_coefficient
+     procedure, pass(u) :: dot_spherical_harmonic_coefficient
+     generic, public :: operator(*) => complex_left_multiply_spherical_harmonic_coefficient,   &
+                                       complex_right_multiply_spherical_harmonic_coefficient,  &
+                                       real_left_multiply_spherical_harmonic_coefficient,      &
+                                       real_right_multiply_spherical_harmonic_coefficient,     &
+                                       real_sp_left_multiply_spherical_harmonic_coefficient,   &
+                                       real_sp_right_multiply_spherical_harmonic_coefficient,  &
+                                       int_left_multiply_spherical_harmonic_coefficient,       &
+                                       int_right_multiply_spherical_harmonic_coefficient,      &
+                                       dot_spherical_harmonic_coefficient     
+     procedure :: add_spherical_harmonic_coefficient
+     generic, public :: operator(+)  => add_spherical_harmonic_coefficient
+     procedure :: subtract_spherical_harmonic_coefficient
+     generic, public :: operator(-)  => subtract_spherical_harmonic_coefficient
+     procedure :: conjg => conjugate_spherical_harmonic_coefficient
+     procedure :: riesz_map => riesz_map_spherical_harmonic_coefficient
+     procedure :: inverse_riesz_map => inverse_riesz_map_spherical_harmonic_coefficient
   end type spherical_harmonic_coefficient
-  
 
-  
+  type, extends(spherical_harmonic_coefficient)  :: real_spherical_harmonic_coefficient
+   contains
+     procedure :: allocate  => allocate_real_spherical_harmonic_coefficient
+  end type real_spherical_harmonic_coefficient
+
+
+
+     
 contains
 
   !=======================================================================!
@@ -174,21 +209,61 @@ contains
   end subroutine delete_spherical_harmonic_coefficient
 
 
-  subroutine allocate_spherical_harmonic_coefficient(u,lmax,nmax)
+  subroutine allocate_spherical_harmonic_coefficient(u,lmax,nmax,s,mu)
     implicit none
     class(spherical_harmonic_coefficient), intent(inout) :: u
     integer(i4b), intent(in) :: lmax,nmax
+    real(dp), intent(in),  optional :: s,mu
     call u%delete()
     u%lmax = lmax
     u%nmax = nmax
     u%ndim =   (nmax+1)*(2*nmax+1)*(2*nmax+3)/3           &
              + (2*nmax + 1)*(lmax-nmax)*(lmax+nmax+2)
     allocate(u%data(u%ndim))
-    u%data = 0.0_dp
+    u%data = 1.0_dp
+    if(present(s)) then
+       u%s = s
+    end if
+    if(present(mu)) then
+       u%mu = mu
+    end if    
     u%allocated = .true.    
     return
   end subroutine allocate_spherical_harmonic_coefficient
 
+
+  subroutine allocate_real_spherical_harmonic_coefficient(u,lmax,nmax,s,mu)
+    implicit none
+    class(real_spherical_harmonic_coefficient), intent(inout) :: u
+    integer(i4b), intent(in) :: lmax,nmax
+    real(dp), intent(in),  optional :: s,mu
+    call u%delete()
+    u%lmax = lmax
+    u%nmax = nmax
+    u%ndim =   (nmax+1)*(2*nmax+1)*(2*nmax+3)/3           &
+             + (2*nmax + 1)*(lmax-nmax)*(lmax+nmax+2)
+    allocate(u%data(u%ndim))
+    u%data = 1.0_dp
+    if(present(s)) then
+       u%s = s
+    end if
+    if(present(mu)) then
+       u%mu = mu
+    end if    
+    u%allocated = .true.    
+    return
+  end subroutine allocate_real_spherical_harmonic_coefficient
+
+
+  subroutine set_sobolev_spherical_harmonic_coefficient(u,s,mu)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(inout) :: u
+    real(dp), intent(in) :: s,mu
+    u%s  = s
+    u%mu = mu
+    return
+  end subroutine set_sobolev_spherical_harmonic_coefficient
+  
   function index_spherical_harmonic_coefficient(u,l,n,m) result(i)
     implicit none
     class(spherical_harmonic_coefficient), intent(in) :: u
@@ -221,18 +296,18 @@ contains
     implicit none
     class(spherical_harmonic_coefficient), intent(in) :: u
     integer(i4b), intent(in) :: l,n,m
-    real(dp) :: v
+    complex(dp) :: v
     integer(i4b) ::i
     i = u%index(l,n,m)
     v = u%data(i)    
-    return
+    return    
   end function get_spherical_harmonic_coefficient
 
   function mslice_spherical_harmonic_coefficient(u,l,n,m1,m2) result(v)
     implicit none
     class(spherical_harmonic_coefficient), intent(in) :: u
     integer(i4b), intent(in) :: l,n,m1,m2
-    real(dp), dimension(m2-m1+1) :: v
+    complex(dp), dimension(m2-m1+1) :: v
     integer(i4b) :: i1,i2
     call error(m1 > m2,'get_mslice_spherical_harmonic_coefficient',' m1 should be less than m2')
     i1 = u%index(l,n,m1)
@@ -260,7 +335,7 @@ contains
     implicit none
     class(spherical_harmonic_coefficient), intent(in) :: u
     integer(i4b), intent(in) :: l,n1,n2,m1,m2
-    real(dp), dimension(n2-n1+1,m2-m1+1) :: v
+    complex(dp), dimension(n2-n1+1,m2-m1+1) :: v
     integer(i4b) :: i1,i2,n
     call error(m1 > m2,'get_mslice_spherical_harmonic_coefficient',' m1 should be less than m2')
     call error(n1 > n2,'get_nslice_spherical_harmonic_coefficient',' n1 should be less than n2')
@@ -273,7 +348,195 @@ contains
   end function nmslice_spherical_harmonic_coefficient
 
 
+  function complex_left_multiply_spherical_harmonic_coefficient(a,u) result(v)
+    implicit none
+    complex(dpc), intent(in) :: a
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function complex_left_multiply_spherical_harmonic_coefficient
+
+  function complex_right_multiply_spherical_harmonic_coefficient(u,a) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    complex(dpc), intent(in) :: a
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function complex_right_multiply_spherical_harmonic_coefficient
+  
+  function real_left_multiply_spherical_harmonic_coefficient(a,u) result(v)
+    implicit none
+    real(dp), intent(in) :: a
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function real_left_multiply_spherical_harmonic_coefficient
+
+  function real_right_multiply_spherical_harmonic_coefficient(u,a) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    real(dp), intent(in) :: a
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function real_right_multiply_spherical_harmonic_coefficient
+
+  
+  function real_sp_left_multiply_spherical_harmonic_coefficient(a,u) result(v)
+    implicit none
+    real(sp), intent(in) :: a
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function real_sp_left_multiply_spherical_harmonic_coefficient
+
+  function real_sp_right_multiply_spherical_harmonic_coefficient(u,a) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    real(sp), intent(in) :: a
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function real_sp_right_multiply_spherical_harmonic_coefficient
+
+  function int_left_multiply_spherical_harmonic_coefficient(a,u) result(v)
+    implicit none
+    integer(i4b), intent(in) :: a
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function int_left_multiply_spherical_harmonic_coefficient
+
+  function int_right_multiply_spherical_harmonic_coefficient(u,a) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    integer(i4b), intent(in) :: a
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = a*v%data
+    return
+  end function int_right_multiply_spherical_harmonic_coefficient
   
 
+  function add_spherical_harmonic_coefficient(u,v) result(w)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient), intent(in) :: v
+    type(spherical_harmonic_coefficient) :: w
+    w = u
+    w%data = u%data + v%data
+    return
+  end function add_spherical_harmonic_coefficient
+
+  function subtract_spherical_harmonic_coefficient(u,v) result(w)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient), intent(in) :: v
+    type(spherical_harmonic_coefficient) :: w
+    w = u
+    w%data = u%data - v%data    
+    return
+  end function subtract_spherical_harmonic_coefficient
+
+
+  function conjugate_spherical_harmonic_coefficient(u) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+    v = u
+    v%data = conjg(v%data)
+    return
+  end function conjugate_spherical_harmonic_coefficient
+
+  function dot_spherical_harmonic_coefficient(v,u) result(f)
+    implicit none
+    type(spherical_harmonic_coefficient), intent(in) :: v
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    complex(dpc) :: f
+
+    integer(i4b) :: l,n,m,i
+    real(dp) :: fac
+
+    i = 0
+    f = 0.0_dp
+    do l = 0,u%lmax
+       fac = (1.0_dp + u%mu**2*l*(l+1))**(u%s)
+       do n = -min(l,u%nmax),min(l,u%nmax)
+          do m = -l,l
+             i = i+1
+             f = f + fac*conjg(v%data(i))*u%data(i)             
+          end do          
+       end do       
+    end do
+    
+    return
+  end function dot_spherical_harmonic_coefficient
+
+  function riesz_map_spherical_harmonic_coefficient(u) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+
+    integer(i4b) :: l,n,m,i
+    real(dp) :: fac
+
+    v = u    
+    i = 0
+    do l = 0,u%lmax
+       fac = (1.0_dp + u%mu**2*l*(l+1))**(u%s)
+       do n = -min(l,u%nmax),min(l,u%nmax)
+          do m = -l,l
+             i = i+1
+             v%data(i) = fac*u%data(i)
+          end do          
+       end do       
+    end do
+    
+    
+    return
+  end function riesz_map_spherical_harmonic_coefficient
+
+  function inverse_riesz_map_spherical_harmonic_coefficient(u) result(v)
+    implicit none
+    class(spherical_harmonic_coefficient), intent(in) :: u
+    type(spherical_harmonic_coefficient) :: v
+
+    integer(i4b) :: l,n,m,i
+    real(dp) :: fac
+
+    v = u    
+    i = 0
+    do l = 0,u%lmax
+       fac = (1.0_dp + u%mu**2*l*(l+1))**(u%s)
+       do n = -min(l,u%nmax),min(l,u%nmax)
+          do m = -l,l
+             i = i+1
+             v%data(i) = u%data(i)/fac
+          end do          
+       end do       
+    end do
+    
+    
+    return
+  end function inverse_riesz_map_spherical_harmonic_coefficient
+  
+
+  !=======================================================================!
+  !                     procedures for transformations                    !
+  !=======================================================================!
+
+  
   
 end module module_spherical_harmonics
