@@ -124,7 +124,6 @@ module module_special_functions
 
   type wigner_array
      logical :: allocated  = .false.
-     logical :: normalised = .false.
      integer(i4b) :: lmax
      integer(i4b) :: nmax
      integer(i4b) :: ndim
@@ -628,9 +627,6 @@ contains
     return
   end subroutine next_wigner_value
 
-
-
-  
   
   function get_single_wigner_value(p,nin,min,flip) result(v)
     implicit none
@@ -736,21 +732,14 @@ contains
   end function index_wigner_array
 
   
-  subroutine set_wigner_array(d,beta,lmax,nmax,norm)
+  subroutine set_wigner_array(d,beta,lmax,nmax)
     implicit none
     class(wigner_array), intent(inout) :: d    
     real(dp), intent(in) :: beta
     integer(i4b), intent(in) :: nmax,lmax
-    logical, intent(in), optional :: norm
     integer(i4b) :: l,i,n,m
-    real(dp) :: fac
     type(wigner_value) :: p
     call d%delete()
-    if(present(norm)) then
-       d%normalised = norm
-    else
-       d%normalised = .false.
-    end if
     d%lmax = lmax
     d%nmax = nmax
     d%ndim = d%index(lmax,nmax,lmax)
@@ -758,16 +747,11 @@ contains
     d%allocated = .true.
     call p%init(beta,nmax,lmax)
     do l = 0,lmax
-       if(d%normalised) then
-          fac = sqrt((2*l+1)/fourpi)
-       else
-          fac = 1.0_dp
-       end if
        call p%next()
        do n = -min(l,nmax),min(l,nmax)
           do m = 0,l
              d%data(d%index(l,n,m)) = p%get(n,m)
-          end do
+          end do          
        end do
     end do
     call p%delete()    

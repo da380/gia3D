@@ -84,7 +84,6 @@ module module_spherical_harmonics
   !===============================================================!
   
   type, abstract :: spherical_harmonic_expansion
-     private
      logical :: allocated
      integer(i4b) :: lmax
      integer(i4b) :: nmax
@@ -196,7 +195,7 @@ contains
     ! make the wigner d-functions
     allocate(grid%d(nth))
     do ith = 1,nth
-       call grid%d(ith)%set(grid%th(ith),lmax,nmax,norm=.true.)
+       call grid%d(ith)%set(grid%th(ith),lmax,nmax)
     end do
     
     ! make the FFTW3 plans
@@ -271,22 +270,16 @@ contains
 
     logical :: flip
     integer(i4b) :: l,m,lmax,nth,nph,ith,ilm,im,sign,jlm,i1,i2,klm
+    real(dp) :: fac,tmp1,tmp2,w
     complex(C_DOUBLE_COMPLEX), pointer :: in(:),out(:)
     type(C_PTR) :: pin,pout
 
-
-    
-    call error(.not.grid%check_field(u),'SH_trans_scalar_spherical_harmonic_expansion', &
-                                        'grid and field are not compatible')
-
-    call error(.not.ulm%allocated,'SH_trans_scalar_spherical_harmonic_expansion', &
-                                  'expansion not allocated')
 
     ! maximum degree for the calculation
     lmax = min(ulm%lmax,grid%lmax)
 
     ! initialise the coefficients
-    call ulm%scale(0.0_dp)
+    ulm%data = 0.0_dp
        
     ! get some parameters
     nth = grid%nth()
@@ -302,29 +295,43 @@ contains
     i2 = 0
     do ith = 1,nth
        i1 = i2+1
-       i2 = i1+nph-1       
+       i2 = i1+nph-1
        in = u%data(i1:i2)
        call fftw_execute_dft(grid%plan_forward,in,out)
        sign = 1
        ilm = 0
        klm = 0
+       w = grid%w(ith)*twopi/grid%nph()
        do l = 0,lmax
           ilm = ilm+1
           klm = klm+1
-          ulm%data(ilm) = ulm%data(ilm) + out(1)*grid%d(ith)%data(klm)
+          tmp1 =  grid%d(ith)%data(klm)*w
+          tmp1 = tmp1*out(1)
+          ulm%data(ilm) = ulm%data(ilm) + tmp1
           do m = 1,l
              ilm = ilm+1
-             klm = klm+1
-             ulm%data(ilm) = ulm%data(ilm) + out(m+1)*grid%d(ith)%data(klm)
-          end do
-          do m = 1,l
-             ilm = ilm+1
-             ulm%data(ilm) = ulm%data(ilm) + sign*out(nph-m+1)*grid%d(ith)%data(klm)
+             klm = klm+1             
+             tmp1 = grid%d(ith)%data(klm)*w
+             tmp2 = sign*tmp1
+             tmp1 = tmp1*out(m+1)
+             ulm%data(ilm) = ulm%data(ilm)+tmp1
+             ilm = ilm+1            
+             tmp2 = tmp2*out(nph-m+1)
+             ulm%data(ilm) = ulm%data(ilm)+tmp2
              sign = -sign
           end do
        end do
     end do
-    call ulm%scale(twopi/grid%nph())
+
+    ! add in normalising factors
+    ilm = 0
+    do l = 0,lmax
+       fac = sqrt((2*l+1)/fourpi)
+       do m = -l,l
+          ilm = ilm+1
+         ulm%data(ilm) = fac*ulm%data(ilm)
+       end do
+    end do
     return
   end subroutine SH_trans_scalar_spherical_harmonic_expansion
 
@@ -796,7 +803,12 @@ contains
     class(scalar_spherical_harmonic_expansion), intent(in) :: self
     integer(i4b), intent(in) :: l,m
     integer(i4b) :: i
-    i = l**2 + m + l + 1    
+    i = l**2
+    if(m >= 0) then
+       i = i + m + 1
+    else
+       i = i + l+1 + m+1
+    end if
     return
   end function index_scalar_spherical_harmonic_expansion
 
