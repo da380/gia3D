@@ -172,6 +172,7 @@ contains
 
 
   subroutine set_trapezoid_quadrature(self,n,a,b)
+    use module_error
     use module_special_functions
     implicit none    
     class(trapezoid_quadrature), intent(inout) :: self
@@ -244,6 +245,7 @@ contains
 
 
   subroutine set_gauss_radau_quadrature(self,n,poly,right)
+    use module_error
     use module_special_functions
     implicit none    
     class(gauss_radau_quadrature), intent(inout) :: self
@@ -331,6 +333,7 @@ contains
 
 
   subroutine set_gauss_lobatto_quadrature(self,n,poly)
+    use module_error
     use module_special_functions
     implicit none    
     class(gauss_lobatto_quadrature), intent(inout) :: self

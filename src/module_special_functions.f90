@@ -1,7 +1,5 @@
-module module_special_functions
-  
+module module_special_functions  
   use module_constants
-  use module_error
   implicit none
   
   type, abstract :: orthogonal_polynomial
@@ -15,7 +13,6 @@ module module_special_functions
      !
      ! with p_{-1} = 0, p_{0} = 1
      !
-     private
      real(dp) :: x1
      real(dp) :: x2
      real(dp) :: mu
@@ -40,7 +37,6 @@ module module_special_functions
 
 
   type, extends(orthogonal_polynomial) :: jacobi_polynomial
-     private
      real(dp) :: alpha,beta
    contains     
      procedure :: weight => jacobi_weight
@@ -72,7 +68,6 @@ module module_special_functions
 
 
   type legendre_value
-     private
      logical  :: allocated = .false.
      integer(i4b) :: l
      integer(i4b) :: mmax
@@ -85,7 +80,6 @@ module module_special_functions
      procedure :: allocate => allocate_legendre_value
      procedure :: init => initialise_legendre_value
      procedure :: next => next_legendre_value
-     procedure :: deg => degree_legendre_value
      procedure :: get_single_legendre_value
      procedure :: get_slice_legendre_value
      generic   :: get => get_single_legendre_value, &
@@ -95,17 +89,14 @@ module module_special_functions
              allocate_legendre_value,   &
              initialise_legendre_value, &
              next_legendre_value,       &
-             degree_legendre_value,     &
              get_single_legendre_value, &
              get_slice_legendre_value
 
 
 
   type wigner_value
-     private
      logical :: allocated = .false.
      logical :: transposed = .false.
-     logical :: frozen = .false.
      integer(i4b) :: l
      integer(i4b) :: nmax
      integer(i4b) :: mmax
@@ -116,11 +107,9 @@ module module_special_functions
    contains
      procedure :: delete => delete_wigner_value
      procedure :: allocate => allocate_wigner_value
-     procedure :: ind => index_wigner_value
+     procedure :: index => index_wigner_value
      procedure :: init => initialise_wigner_value
      procedure :: next => next_wigner_value
-     procedure :: freeze => freeze_wigner_value
-     procedure :: deg => degree_wigner_value
      procedure :: get_single_wigner_value
      procedure :: get_slice_wigner_value
      generic   :: get => get_single_wigner_value, &
@@ -130,12 +119,21 @@ module module_special_functions
              allocate_wigner_value,   &
              initialise_wigner_value, &
              next_wigner_value,       &
-             degree_wigner_value,     &
              get_single_wigner_value
 
-  
 
-
+  type wigner_array
+     logical :: allocated  = .false.
+     logical :: normalised = .false.
+     integer(i4b) :: lmax
+     integer(i4b) :: nmax
+     integer(i4b) :: ndim
+     real(dp), dimension(:), allocatable :: data
+   contains
+     procedure :: delete => delete_wigner_array
+     procedure :: index => index_wigner_array
+     procedure :: set => set_wigner_array
+  end type wigner_array
   
 
 contains
@@ -265,7 +263,6 @@ contains
     real(dp) :: fac
     check = (alpha > -1.0_dp) .and. (beta > -1.0_dp) &
             .and. (alpha + beta > -1.0_dp)
-    call error(.not.check,'jacobi','invalid alpha and beta')
     p%alpha = alpha
     p%beta = beta
     p%x1 = -1.0_dp
@@ -429,13 +426,6 @@ contains
     return
   end subroutine next_legendre_value
 
-  function degree_legendre_value(p) result(l)
-    implicit none
-    class(legendre_value), intent(in) :: p
-    integer(i4b) :: l
-    l = p%l
-    return
-  end function degree_legendre_value
   
   function get_single_legendre_value(p,m,flip) result(v)
     implicit none
@@ -443,8 +433,6 @@ contains
     integer(i4b), intent(in) :: m
     logical, intent(in), optional :: flip
     real(dp) :: v
-    call error(.not.p%allocated,'get_single_legendre_value','not allocated')
-    call error(abs(m) > p%mmax, 'get_single_legendre_value','m out of range')  
     v = p%v(abs(m))
     if(m < 0 .and. modulo(m,2) /= 0) v = -v
     if(present(flip)) then
@@ -463,9 +451,6 @@ contains
     real(dp), dimension(m2-m1+1) :: v
     logical, intent(in), optional :: flip
     integer(i4b) :: m,im
-    call error(.not.p%allocated,'get_single_legendre_value','not allocated')
-    call error(abs(m1) > p%mmax, 'get_single_legendre_value','m out of range')
-    call error(abs(m2) > p%mmax, 'get_single_legendre_value','m out of range')
     im = 0
     do m = m1,m2
        im = im+1
@@ -561,7 +546,6 @@ contains
     integer(i4b) :: l,m,n,mmax,nmax,i,ip1,j,nm
     real(dp) :: beta,cb,chb,shb,fac1,fac2,fac3,xl,xm,xn
     ! set local paramters
-    call error(p%frozen,'next_wigner_value','value frozen')
     mmax = p%mmax
     nmax = p%nmax
     l = p%l +1
@@ -645,35 +629,18 @@ contains
   end subroutine next_wigner_value
 
 
-  subroutine freeze_wigner_value(p)
-    implicit none
-    class(wigner_value), intent(inout) :: p
-    call error(.not.p%allocated,'freeze_wigner_value','value not allocated')
-    deallocate(p%vm1,p%vp1)
-    return
-  end subroutine freeze_wigner_value
-  
-  function degree_wigner_value(p) result(l)
-    implicit none
-    class(wigner_value), intent(in) :: p
-    integer(i4b) :: l
-    l = p%l
-    return
-  end function degree_wigner_value
-
 
   
-  function get_single_wigner_value(p,nin,min,norm,flip) result(v)
+  
+  function get_single_wigner_value(p,nin,min,flip) result(v)
     implicit none
     class(wigner_value), intent(in) :: p
     integer(i4b), intent(in) :: nin,min
-    logical, intent(in), optional  :: norm
     logical, intent(in), optional  :: flip
     real(dp) :: v
     logical ::  check
     integer(i4b) :: l,n,m,i,sign,mmax,nmax,j
     real(dp) :: fac
-    call error(.not.p%allocated,'get_single_wigner_value','not allocated')
     l = p%l    
     ! transpose the indices if needed
     if(p%transposed) then
@@ -685,8 +652,6 @@ contains
     end if
     mmax = p%mmax
     nmax = p%nmax
-    call error(abs(m) > mmax, 'get_single_wigner_value','m out of range')
-    call error(abs(n) > nmax, 'get_single_wigner_value','n out of range')  
     sign = 1
     if(present(flip)) then
        if(flip) then
@@ -718,24 +683,17 @@ contains
        ! fix sign if the transposed matrix is stored
        if(modulo(n-m,2) /= 0) sign = -sign
     end if
-    i = p%ind(n,m)
-    fac = 1.0_dp
-    if(present(norm)) then
-       if(norm) then
-          fac = sqrt((2*l+1)/fourpi)
-       end if       
-    end if
-    v = sign*fac*p%v(i)
+    i = p%index(n,m)
+    v = sign*p%v(i)
     return
   end function get_single_wigner_value
 
   
-  function get_slice_wigner_value(p,n1,n2,m1,m2,norm,flip) result(v)
+  function get_slice_wigner_value(p,n1,n2,m1,m2,flip) result(v)
     implicit none
     class(wigner_value), intent(in) :: p
     integer(i4b), intent(in) :: n1,n2,m1,m2
     real(dp), dimension(n2-n1+1,m2-m1+1) :: v
-    logical, intent(in), optional :: norm
     logical, intent(in), optional :: flip
     integer(i4b) :: n,m,i,j
     i = 0
@@ -744,14 +702,76 @@ contains
        j = 0
        do m = m1,m2
           j = j+1
-          v(i,j) = p%get(n,m,norm,flip)          
+          v(i,j) = p%get(n,m,flip)          
        end do
     end do
     return
   end function get_slice_wigner_value
 
+
+  subroutine delete_wigner_array(d)
+    implicit none
+    class(wigner_array), intent(inout) :: d
+    if(.not.d%allocated) return
+    deallocate(d%data)
+    d%allocated = .false.
+    return
+  end subroutine delete_wigner_array
+
+
+  function index_wigner_array(d,l,n,m) result(i)
+    implicit none
+    class(wigner_array), intent(in) :: d
+    integer(i4b), intent(in) :: l,n,m
+    integer(i4b) :: i,nmax
+    nmax = d%nmax
+    if(l <= nmax) then
+       i = l*(l+1)*(4*l-1)/6 + (l+n)*(l+1) + m + 1
+    else
+       i =    (nmax+1)*(nmax+2)*(4*nmax+3)/6      &
+            + (2*nmax+1)*(l-nmax-1)*(l+nmax+2)/2  & 
+            + (nmax+n)*(l+1)+m+1
+    end if
+    return
+  end function index_wigner_array
+
   
-
-
+  subroutine set_wigner_array(d,beta,lmax,nmax,norm)
+    implicit none
+    class(wigner_array), intent(inout) :: d    
+    real(dp), intent(in) :: beta
+    integer(i4b), intent(in) :: nmax,lmax
+    logical, intent(in), optional :: norm
+    integer(i4b) :: l,i,n,m
+    real(dp) :: fac
+    type(wigner_value) :: p
+    call d%delete()
+    if(present(norm)) then
+       d%normalised = norm
+    else
+       d%normalised = .false.
+    end if
+    d%lmax = lmax
+    d%nmax = nmax
+    d%ndim = d%index(lmax,nmax,lmax)
+    allocate(d%data(d%ndim))
+    d%allocated = .true.
+    call p%init(beta,nmax,lmax)
+    do l = 0,lmax
+       if(d%normalised) then
+          fac = sqrt((2*l+1)/fourpi)
+       else
+          fac = 1.0_dp
+       end if
+       call p%next()
+       do n = -min(l,nmax),min(l,nmax)
+          do m = 0,l
+             d%data(d%index(l,n,m)) = p%get(n,m)
+          end do
+       end do
+    end do
+    call p%delete()    
+    return
+  end subroutine set_wigner_array
   
 end module module_special_functions

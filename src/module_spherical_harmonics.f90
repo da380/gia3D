@@ -2,32 +2,89 @@ module module_spherical_harmonics
   
   use module_constants
   use module_error
-  use module_special_functions, only : wigner_value
+  use module_special_functions
   use, intrinsic :: iso_c_binding
 
+
+  !===============================================================!
+  !               type declaration for the GL-grid                !
+  !===============================================================!
+  
   type gauss_legendre_grid
-     private
      logical :: allocated = .false.
-     logical :: precomp   = .true.
      integer(i4b) :: lmax
      integer(i4b) :: nmax
-     integer(i4b) :: nth
-     integer(i4b) :: nph
      real(dp), dimension(:), allocatable :: th
      real(dp), dimension(:), allocatable :: w
-     type(wigner_value), dimension(:,:), allocatable :: dlm
+     type(wigner_array), dimension(:), allocatable :: d
      type(C_PTR) :: plan_forward
      type(C_PTR) :: plan_backward
      type(C_PTR) :: plan_r2c
      type(C_PTR) :: plan_c2r
    contains
-     procedure :: delete => delete_gauss_legendre_grid
-     procedure :: build =>  build_gauss_legendre_grid
-     procedure :: ph    =>  ph_gauss_legednre_grid
+     procedure :: delete  => delete_gauss_legendre_grid
+     procedure :: allocate   =>  allocate_gauss_legendre_grid
+     procedure :: nth => nth_gauss_legendre_grid
+     procedure :: nph => nph_gauss_legendre_grid
+     procedure :: ph  =>  ph_gauss_legednre_grid
+     procedure :: check_field => check_field_gauss_legendre_grid
+     procedure :: SH_trans_scalar_spherical_harmonic_expansion
+     generic :: SH_trans => SH_trans_scalar_spherical_harmonic_expansion
   end type gauss_legendre_grid
 
 
+  !===============================================================!
+  !              type declarations for the GL-fields              !
+  !===============================================================!
+
+  type, abstract :: gauss_legendre_field
+     logical :: allocated = .false.
+     integer(i4b) :: lmax
+     integer(i4b) :: ndim
+     complex(dpc), dimension(:), allocatable :: data
+   contains
+     procedure :: delete => delete_gauss_legendre_field
+     procedure :: nth => nth_gauss_legendre_field
+     procedure :: nph => nph_gauss_legendre_field
+     procedure :: check => check_gauss_legendre_field
+     procedure :: assign_gauss_legendre_field
+     generic, public :: assignment(=) => assign_gauss_legendre_field
+     procedure, pass(self) :: add_gauss_legendre_field     
+     generic, public :: operator(+)  => add_gauss_legendre_field     
+     procedure, pass(self) :: subtract_gauss_legendre_field     
+     generic, public :: operator(-)  => subtract_gauss_legendre_field     
+     procedure, pass(self) :: left_multiply_gauss_legendre_field
+     procedure, pass(self) :: right_multiply_gauss_legendre_field
+     procedure, pass(self) :: real_left_multiply_gauss_legendre_field
+     procedure, pass(self) :: real_right_multiply_gauss_legendre_field
+     generic, public :: operator(*)  => left_multiply_gauss_legendre_field,       &
+                                        right_multiply_gauss_legendre_field,      &
+                                        real_left_multiply_gauss_legendre_field,  &
+                                        real_right_multiply_gauss_legendre_field
+     procedure :: scale_gauss_legendre_field
+     procedure :: real_scale_gauss_legendre_field
+     generic   :: scale => scale_gauss_legendre_field,     &
+                           real_scale_gauss_legendre_field
+     procedure :: saxpy_gauss_legendre_field
+     procedure :: real_saxpy_gauss_legendre_field          
+     generic   :: saxpy => saxpy_gauss_legendre_field,     &
+                          real_saxpy_gauss_legendre_field
+  end type gauss_legendre_field
+  
+  
+  type, extends(gauss_legendre_field) :: scalar_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_scalar_gauss_legendre_field
+     procedure :: index => index_scalar_gauss_legendre_field
+  end type scalar_gauss_legendre_field
+  
+
+  !===============================================================!
+  !                 type declarations SH expansions               !
+  !===============================================================!
+  
   type, abstract :: spherical_harmonic_expansion
+     private
      logical :: allocated
      integer(i4b) :: lmax
      integer(i4b) :: nmax
@@ -67,10 +124,9 @@ module module_spherical_harmonics
   type, extends(spherical_harmonic_expansion) :: scalar_spherical_harmonic_expansion
    contains
      procedure :: allocate => allocate_scalar_spherical_harmonic_expansion
+     procedure :: index    => index_scalar_spherical_harmonic_expansion
+     procedure :: conjg    => conjg_scalar_spherical_harmonic_expansion
   end type scalar_spherical_harmonic_expansion
-
-  
-
 
 
      
@@ -90,7 +146,7 @@ contains
   end subroutine delete_gauss_legendre_grid
 
   
-  subroutine build_gauss_legendre_grid(grid,lmax,nmax,fftw_flag,precomp)
+  subroutine allocate_gauss_legendre_grid(grid,lmax,nmax,fftw_flag)
     use module_special_functions
     use module_quadrature
     use module_fftw3    
@@ -99,9 +155,10 @@ contains
     integer(i4b), intent(in) :: lmax
     integer(i4b), intent(in) :: nmax
     integer(C_INT), intent(in), optional :: fftw_flag
-    logical, intent(in), optional :: precomp
+
     
-    integer(i4b) :: l,ith,n
+    integer(i4b) :: l,ith,n,nth,nph,ndim
+    real(dp) :: fac
     class(orthogonal_polynomial), allocatable :: poly
     type(gauss_quadrature) :: quad
     real(C_DOUBLE), pointer :: rin(:)
@@ -117,10 +174,6 @@ contains
        plan_flag = FFTW_MEASURE
     end if
     
-    if(present(precomp)) then
-       grid%precomp = precomp
-    end if
-       
     
     ! check it has not already been allocated
     call grid%delete()
@@ -128,10 +181,10 @@ contains
     ! store the basic parameters
     grid%lmax = lmax
     grid%nmax = nmax
-    grid%nth  = lmax+1
-    grid%nph  = 2*lmax
-
-    ! build the quadrature points and weights
+    nth = lmax+1
+    nph = 2*lmax
+    
+    ! make the quadrature points and weights
     allocate(grid%th(lmax+1))
     allocate(grid%w(lmax+1))
     poly = legendre()
@@ -139,24 +192,15 @@ contains
     grid%th = acos(quad%points())
     grid%w = quad%weights()
 
-    
-    ! precompute the wigner d-functions
-    if(grid%precomp) then
-       allocate(grid%dlm(0:lmax,grid%nth/2+1))
-       do ith = 1,grid%nth/2+1
-          call grid%dlm(0,ith)%init(grid%th(ith),nmax,lmax)
-          do l = 0,lmax-1
-             call grid%dlm(l,ith)%next()
-             grid%dlm(l+1,ith) = grid%dlm(l,ith)
-             call grid%dlm(l,ith)%freeze()
-          end do
-          call grid%dlm(lmax,ith)%next()
-          call grid%dlm(lmax,ith)%freeze()
-       end do
-    end if
 
-    ! make the FFTW3 pland
-    n = grid%nph
+    ! make the wigner d-functions
+    allocate(grid%d(nth))
+    do ith = 1,nth
+       call grid%d(ith)%set(grid%th(ith),lmax,nmax,norm=.true.)
+    end do
+    
+    ! make the FFTW3 plans
+    n = 2*lmax
     pin  = fftw_alloc_complex(int(n, C_SIZE_T))
     pout = fftw_alloc_complex(int(n, C_SIZE_T))
     call c_f_pointer(pin,   in, [n])
@@ -178,20 +222,353 @@ contains
     
     grid%allocated =.true.
     return
-  end subroutine build_gauss_legendre_grid
+  end subroutine allocate_gauss_legendre_grid
 
+  function nth_gauss_legendre_grid(grid) result(nth)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b) :: nth
+    nth = grid%lmax+1
+    return
+  end function nth_gauss_legendre_grid
+
+  
+  function nph_gauss_legendre_grid(grid) result(nph)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b) :: nph
+    nph = 2*grid%lmax
+    return
+  end function nph_gauss_legendre_grid
+  
+  
   function ph_gauss_legednre_grid(grid,iph) result(ph)
     implicit none
     class(gauss_legendre_grid), intent(in) :: grid
     integer(i4b), intent(in) :: iph
     real(dp) :: ph
-    ph = (iph-1)*twopi/grid%nph
+    ph = (iph-1)*twopi/grid%nph()
     return
   end function ph_gauss_legednre_grid
+  
 
+  function check_field_gauss_legendre_grid(grid,u) result(check)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    type(scalar_gauss_legendre_field), intent(in) :: u
+    logical :: check
+    check = grid%allocated .and. u%allocated
+    check = check .and. (grid%lmax == u%lmax)    
+    return
+  end function check_field_gauss_legendre_grid
+  
+  subroutine SH_trans_scalar_spherical_harmonic_expansion(grid,u,ulm)
+    use module_fftw3
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    type(scalar_gauss_legendre_field), intent(in) :: u
+    type(scalar_spherical_harmonic_expansion), intent(inout) :: ulm
+
+    logical :: flip
+    integer(i4b) :: l,m,lmax,nth,nph,ith,ilm,im,sign,jlm,i1,i2,klm
+    complex(C_DOUBLE_COMPLEX), pointer :: in(:),out(:)
+    type(C_PTR) :: pin,pout
+
+
+    
+    call error(.not.grid%check_field(u),'SH_trans_scalar_spherical_harmonic_expansion', &
+                                        'grid and field are not compatible')
+
+    call error(.not.ulm%allocated,'SH_trans_scalar_spherical_harmonic_expansion', &
+                                  'expansion not allocated')
+
+    ! maximum degree for the calculation
+    lmax = min(ulm%lmax,grid%lmax)
+
+    ! initialise the coefficients
+    call ulm%scale(0.0_dp)
+       
+    ! get some parameters
+    nth = grid%nth()
+    nph = grid%nph()
+
+    ! set up the C pointers
+    pin  = fftw_alloc_complex(int(nph, C_SIZE_T))
+    pout = fftw_alloc_complex(int(nph, C_SIZE_T))
+    call c_f_pointer(pin,   in, [nph])
+    call c_f_pointer(pout, out, [nph])
+
+    ! perform the transformation
+    i2 = 0
+    do ith = 1,nth
+       i1 = i2+1
+       i2 = i1+nph-1       
+       in = u%data(i1:i2)
+       call fftw_execute_dft(grid%plan_forward,in,out)
+       sign = 1
+       ilm = 0
+       klm = 0
+       do l = 0,lmax
+          ilm = ilm+1
+          klm = klm+1
+          ulm%data(ilm) = ulm%data(ilm) + out(1)*grid%d(ith)%data(klm)
+          do m = 1,l
+             ilm = ilm+1
+             klm = klm+1
+             ulm%data(ilm) = ulm%data(ilm) + out(m+1)*grid%d(ith)%data(klm)
+          end do
+          do m = 1,l
+             ilm = ilm+1
+             ulm%data(ilm) = ulm%data(ilm) + sign*out(nph-m+1)*grid%d(ith)%data(klm)
+             sign = -sign
+          end do
+       end do
+    end do
+    call ulm%scale(twopi/grid%nph())
+    return
+  end subroutine SH_trans_scalar_spherical_harmonic_expansion
+
+
+
+  !=======================================================================!
+  !                    procedures for the field types                     !
+  !=======================================================================!
+
+  !-----------------------------------------------!
+  !               the abstract type               !
+  !-----------------------------------------------!
+
+  subroutine delete_gauss_legendre_field(self)
+    implicit none
+    class(gauss_legendre_field), intent(inout) :: self
+    if(.not.self%allocated) return
+    deallocate(self%data)
+    self%allocated = .false.
+    return
+  end subroutine delete_gauss_legendre_field
+  
+  function nth_gauss_legendre_field(self) result(nth)
+    implicit none
+    class(gauss_legendre_field), intent(in) :: self
+    integer(i4b) :: nth
+    nth = self%lmax+1
+    return
+  end function nth_gauss_legendre_field
+
+  function nph_gauss_legendre_field(self) result(nph)
+    implicit none
+    class(gauss_legendre_field), intent(in) :: self
+    integer(i4b) :: nph
+    nph = 2*self%lmax
+    return
+  end function nph_gauss_legendre_field
+  
+  function check_gauss_legendre_field(self,other) result(check)
+    implicit none
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), intent(in) :: other
+    logical :: check
+    check = self%allocated .and. other%allocated
+    if(.not.check) return
+    check = check .and. (self%lmax == other%lmax)
+    check = check .and. (self%ndim == other%ndim)
+    return
+  end function check_gauss_legendre_field
+
+  subroutine assign_gauss_legendre_field(self,other)
+    implicit none
+    class(gauss_legendre_field), intent(inout) :: self
+    class(gauss_legendre_field), intent(in) :: other
+    if(.not.other%allocated) then
+       call self%delete()
+       return
+    end if
+    if(self%check(other)) then
+       self%lmax = other%lmax
+       self%ndim = other%ndim
+       self%data = other%data               
+    else
+       self%allocated = .true.
+       self%lmax = other%lmax
+       self%ndim = other%ndim
+       allocate(self%data(self%ndim))
+       self%data = other%data
+    end if
+    return
+  end subroutine assign_gauss_legendre_field
+
+
+  function add_gauss_legendre_field(self,other) result(new)
+    implicit none
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), intent(in) :: other
+    class(gauss_legendre_field), allocatable :: new
+    call error(.not.self%check(other),'add_gauss_legendre_field','incompatible inputs')
+    allocate(new,source = self)
+    new%allocated = .true.
+    new%lmax = self%lmax
+    new%ndim = self%ndim
+    new%data = self%data + other%data
+    return
+  end function add_gauss_legendre_field
+
+  function subtract_gauss_legendre_field(self,other) result(new)
+    implicit none
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), intent(in) :: other
+    class(gauss_legendre_field), allocatable :: new
+    call error(.not.self%check(other),'subtract_gauss_legendre_field','incompatible inputs')
+    allocate(new,source = self)
+    new%allocated = .true.
+    new%lmax = self%lmax
+    new%ndim = self%ndim
+    new%data = self%data - other%data
+    return
+  end function subtract_gauss_legendre_field
+
+  function left_multiply_gauss_legendre_field(a,self) result(new)
+    implicit none
+    complex(dpc), intent(in) :: a
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), allocatable :: new
+    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
+    allocate(new,source = self)
+    new%allocated = .true.
+    new%lmax = self%lmax
+    new%ndim = self%ndim
+    new%data = a*self%data
+    return
+  end function left_multiply_gauss_legendre_field
+
+  function right_multiply_gauss_legendre_field(self,a) result(new)
+    implicit none
+    complex(dpc), intent(in) :: a
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), allocatable :: new
+    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
+    allocate(new,source = self)
+    new%allocated = .true.
+    new%lmax = self%lmax
+    new%ndim = self%ndim
+    new%data = a*self%data
+    return
+  end function right_multiply_gauss_legendre_field
+
+  function real_left_multiply_gauss_legendre_field(a,self) result(new)
+    implicit none
+    real(dp), intent(in) :: a
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), allocatable :: new
+    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
+    allocate(new,source = self)
+    new%allocated = .true.
+    new%lmax = self%lmax
+    new%ndim = self%ndim
+    new%data = a*self%data
+    return
+  end function real_left_multiply_gauss_legendre_field
+
+  function real_right_multiply_gauss_legendre_field(self,a) result(new)
+    implicit none
+    real(dp), intent(in) :: a
+    class(gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_field), allocatable :: new
+    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
+    allocate(new,source = self)
+    new%allocated = .true.
+    new%lmax = self%lmax
+    new%ndim = self%ndim
+    new%data = a*self%data
+    return
+  end function real_right_multiply_gauss_legendre_field
+
+  subroutine scale_gauss_legendre_field(self,a)
+    implicit none
+    class(gauss_legendre_field), intent(inout) :: self
+    complex(dpc), intent(in) :: a
+    call error(.not.self%allocated,'scale_gauss_legendre_field','not allocated')    
+    self%data = a*self%data
+    return
+  end subroutine scale_gauss_legendre_field
+
+  subroutine real_scale_gauss_legendre_field(self,a)
+    implicit none
+    class(gauss_legendre_field), intent(inout) :: self
+    real(dp), intent(in) :: a
+    call error(.not.self%allocated,'real_scale_gauss_legendre_field','not allocated')
+    self%data = a*self%data
+    return
+  end subroutine real_scale_gauss_legendre_field
+
+  subroutine saxpy_gauss_legendre_field(self,a,other)
+    implicit none
+    class(gauss_legendre_field), intent(inout) :: self
+    complex(dpc), intent(in) :: a
+    class(gauss_legendre_field), intent(in) :: other
+    call error(.not.self%check(other),'saxpy_gauss_legendre_field', &
+                                      'incompatible inputs')
+    self%data = a*self%data + other%data
+    return
+  end subroutine saxpy_gauss_legendre_field
+
+  subroutine real_saxpy_gauss_legendre_field(self,a,other)
+    implicit none
+    class(gauss_legendre_field), intent(inout) :: self
+    real(dp), intent(in) :: a
+    class(gauss_legendre_field), intent(in) :: other
+    call error(.not.self%check(other),'real_saxpy_gauss_legendre_field', &
+                                      'incompatible inputs')
+    self%data = a*self%data + other%data
+    return
+  end subroutine real_saxpy_gauss_legendre_field
+
+
+
+  
+  !-----------------------------------------------!
+  !                 scalar fields                 !
+  !-----------------------------------------------!
+  
+
+
+
+  subroutine allocate_scalar_gauss_legendre_field(self,grid)
+    implicit none
+    class(scalar_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call self%delete()
+    call error(.not.grid%allocated,'allocate_scalar_gauss_legendre_field','grid not allocated')
+    self%lmax = grid%lmax
+    self%ndim = grid%nph()*grid%nth() 
+    allocate(self%data(self%ndim))
+    self%allocated = .true.
+    return
+  end subroutine allocate_scalar_gauss_legendre_field
+
+  function index_scalar_gauss_legendre_field(self,iph,ith) result(i)
+    implicit none
+    class(scalar_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: iph,ith
+    integer(i4b) :: i
+    call error(.not.self%allocated,'index_scalar_gauss_legendre_field','field not allocated')
+    call error(iph < 1 .or. iph > self%nph(), 'index_scalar_gauss_legendre_field','iph out of range')
+    call error(ith < 1 .or. ith > self%nth(), 'index_scalar_gauss_legendre_field','iph out of range')
+    i = self%nph()*(ith-1)+iph
+    return
+  end function index_scalar_gauss_legendre_field
+
+  
+
+  
+  
   !=======================================================================!
   !          procedures for the spherical_harmonic_expansion type         !
   !=======================================================================!
+
+
+  !-----------------------------------------------!
+  !               the abstract type               !
+  !-----------------------------------------------!
   
   subroutine delete_spherical_harmonic_expansion(u)
     implicit none
@@ -394,13 +771,10 @@ contains
     return
   end subroutine real_saxpy_spherical_harmonic_expansion
 
-  
 
-
-  !=======================================================================!
-  !                      procedures for scalar fields                     !
-  !=======================================================================!
-
+  !-----------------------------------------------!
+  !                 scalar fields                 !
+  !-----------------------------------------------!
 
   subroutine allocate_scalar_spherical_harmonic_expansion(self,lmax)
     implicit none
@@ -417,124 +791,24 @@ contains
   end subroutine allocate_scalar_spherical_harmonic_expansion
 
 
+  function index_scalar_spherical_harmonic_expansion(self,l,m) result(i)
+    implicit none
+    class(scalar_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: l,m
+    integer(i4b) :: i
+    i = l**2 + m + l + 1    
+    return
+  end function index_scalar_spherical_harmonic_expansion
 
-  
-!  function index_spherical_harmonic_expansion(u,l,n,m) result(i)
-!    implicit none
-!    class(spherical_harmonic_expansion), intent(in) :: u
-!    integer(i4b), intent(in) :: l,n,m
-!    integer(i4b) :: i
-
-!    call error( l < 0 .or. l > u%lmax, &
-!         'index_spherical_harmonic_expansion','l out of range')
-!    call error(abs(n) > l .or. abs(n) > u%nmax, &
-!         'index_spherical_harmonic_expansion','n out of range')
-!    call error(abs(m) > l, &
-!         'index_spherical_harmonic_expansion','m out of range')
-
-!    if(l > u%nmax) then
-!       i = (u%nmax+1)*(2*u%nmax+1)*(2*u%nmax+3)/3 + (2*u%nmax + 1)*(l-1-u%nmax)*(l+u%nmax+1)
-!    else
-!       i = l*(4*l*l-1)/3
-!    end if
-!    if(l >= u%nmax) then
-!       i = i + (n+u%nmax)*(2*l+1) + m+l + 1
-!    else
-!       i = i + (n+l)*(2*l+1) + m+l+1
-!    end if
-    
-!    return
-!  end function index_spherical_harmonic_expansion
+  subroutine conjg_scalar_spherical_harmonic_expansion(self)
+    implicit none
+    class(scalar_spherical_harmonic_expansion), intent(inout) :: self
+    call error(.not.self%allocated,'conjg_scalar_spherical_harmonic_expansion','not allocated')
+    self%data = conjg(self%data)
+    return
+  end subroutine conjg_scalar_spherical_harmonic_expansion
 
 
-!  subroutine allocate_spherical_harmonic_expansion(u,lmax,nmax,s,mu)
-!    implicit none
-!    class(spherical_harmonic_expansion), intent(inout) :: u
-!    integer(i4b), intent(in) :: lmax,nmax
-!    real(dp), intent(in),  optional :: s,mu
-!    call u%delete()
-!    u%lmax = lmax
-!    u%nmax = nmax
-!    u%ndim =   (nmax+1)*(2*nmax+1)*(2*nmax+3)/3           &
-!             + (2*nmax + 1)*(lmax-nmax)*(lmax+nmax+2)
-!    allocate(u%data(u%ndim))
-!    u%data = 1.0_dp
-!    if(present(s)) then
-!       u%s = s
-!    end if
-!    if(present(mu)) then
-!       u%mu = mu
-!    end if    
-!    u%allocated = .true.    
-!    return
-!  end subroutine allocate_spherical_harmonic_expansion
-
-  
-
-  !  function get_spherical_harmonic_expansion(u,l,n,m) result(v)
-!    implicit none
-!    class(spherical_harmonic_expansion), intent(in) :: u
-!    integer(i4b), intent(in) :: l,n,m
-!    complex(dp) :: v
-!    integer(i4b) ::i
-!    i = u%index(l,n,m)
-!    v = u%data(i)    
-!    return    
-!  end function get_spherical_harmonic_expansion
-
-!  function mslice_spherical_harmonic_expansion(u,l,n,m1,m2) result(v)
-!    implicit none
-!    class(spherical_harmonic_expansion), intent(in) :: u
-!    integer(i4b), intent(in) :: l,n,m1,m2
-!    complex(dp), dimension(m2-m1+1) :: v
-!    integer(i4b) :: i1,i2
-!    call error(m1 > m2,'get_mslice_spherical_harmonic_expansion',' m1 should be less than m2')
-!    i1 = u%index(l,n,m1)
-!    i2 = u%index(l,n,m2)
-!    v = u%data(i1:i2)    
-!    return
-!  end function mslice_spherical_harmonic_expansion
-
-
-!  function nslice_spherical_harmonic_expansion(u,l,n1,n2,m) result(v)
-!    implicit none
-!    class(spherical_harmonic_expansion), intent(in) :: u
-!    integer(i4b), intent(in) :: l,n1,n2,m
-!    real(dp), dimension(n2-n1+1) :: v
-!    integer(i4b) :: i,n
-!    call error(n1 > n2,'get_nslice_spherical_harmonic_expansion',' n1 should be less than n2')
-!    do n = n1,n2
-!       i = u%index(l,n,m)
-!       v(n+u%nmax+1) = u%data(i)    
-!    end do
-!    return
-!  end function nslice_spherical_harmonic_expansion
-
-!  function nmslice_spherical_harmonic_expansion(u,l,n1,n2,m1,m2) result(v)
-!    implicit none
-!    class(spherical_harmonic_expansion), intent(in) :: u
-!    integer(i4b), intent(in) :: l,n1,n2,m1,m2
-!    complex(dp), dimension(n2-n1+1,m2-m1+1) :: v
-!    integer(i4b) :: i1,i2,n
-!    call error(m1 > m2,'get_mslice_spherical_harmonic_expansion',' m1 should be less than m2')
-!    call error(n1 > n2,'get_nslice_spherical_harmonic_expansion',' n1 should be less than n2')
-!    do n = n1,n2
-!       i1 = u%index(l,n,m1)
-!       i2 = u%index(l,n,m2)
-!       v(n+u%nmax+1,:) = u%data(i1:i2)    
-!    end do
-!    return
-!  end function nmslice_spherical_harmonic_expansion
-
-
-  !function conjugate_spherical_harmonic_expansion(u) result(v)
-  !  implicit none
-  !  class(spherical_harmonic_expansion), intent(in) :: u
-  !  class(spherical_harmonic_expansion), allocatable :: v
-  !  v = u
-  !  v%data = conjg(v%data)
-  !  return
-  !end function conjugate_spherical_harmonic_expansion
   
 end module module_spherical_harmonics
 

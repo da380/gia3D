@@ -42,7 +42,7 @@ program test_special_funtions
      call p%next()
      print *, p%get(0,l)
      call d%next()
-     print *, d%get(0,0,0,l,norm=.true.)
+     print *, d%get(0,0,0,l)
   end do
   
 end program test_special_funtions
