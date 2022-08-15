@@ -303,20 +303,20 @@ contains
        klm = 0
        w = grid%w(ith)*twopi/grid%nph()
        do l = 0,lmax
-          ilm = ilm+1
           klm = klm+1
           tmp1 =  grid%d(ith)%data(klm)*w
           tmp1 = tmp1*out(1)
+          ilm = ilm+1
           ulm%data(ilm) = ulm%data(ilm) + tmp1
           do m = 1,l
-             ilm = ilm+1
              klm = klm+1             
              tmp1 = grid%d(ith)%data(klm)*w
              tmp2 = sign*tmp1
              tmp1 = tmp1*out(m+1)
+             ilm = ilm+1
              ulm%data(ilm) = ulm%data(ilm)+tmp1
-             ilm = ilm+1            
              tmp2 = tmp2*out(nph-m+1)
+             ilm = ilm+1            
              ulm%data(ilm) = ulm%data(ilm)+tmp2
              sign = -sign
           end do

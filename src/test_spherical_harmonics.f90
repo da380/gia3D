@@ -43,7 +43,7 @@ program test_spherical_harmonics
   print *, finish-start
 
 !  ilm = 0
-!  do l = 0,lmax
+!  do l = 0,3
 !     ilm = ilm+1
 !     print *, l,0,ulm%data(ilm)
 !     do m = 1,l
