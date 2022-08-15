@@ -804,10 +804,12 @@ contains
     integer(i4b), intent(in) :: l,m
     integer(i4b) :: i
     i = l**2
-    if(m >= 0) then
-       i = i + m + 1
+    if(m == 0) then
+       i = i+1
+    else if(m > 0) then
+       i = i + 2*m
     else
-       i = i + l+1 + m+1
+       i = i -2*m+1
     end if
     return
   end function index_scalar_spherical_harmonic_expansion
