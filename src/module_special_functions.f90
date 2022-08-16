@@ -126,11 +126,9 @@ module module_special_functions
      logical :: allocated  = .false.
      integer(i4b) :: lmax
      integer(i4b) :: nmax
-     integer(i4b) :: ndim
-     real(dp), dimension(:), allocatable :: data
+     real(dp), dimension(:,:), allocatable :: data
    contains
      procedure :: delete => delete_wigner_array
-     procedure :: index => index_wigner_array
      procedure :: set => set_wigner_array
   end type wigner_array
   
@@ -715,21 +713,6 @@ contains
   end subroutine delete_wigner_array
 
 
-  function index_wigner_array(d,l,n,m) result(i)
-    implicit none
-    class(wigner_array), intent(in) :: d
-    integer(i4b), intent(in) :: l,n,m
-    integer(i4b) :: i,nmax
-    nmax = d%nmax
-    if(l <= nmax) then
-       i = l*(l+1)*(4*l-1)/6 + (l+n)*(l+1) + m + 1
-    else
-       i =    (nmax+1)*(nmax+2)*(4*nmax+3)/6      &
-            + (2*nmax+1)*(l-nmax-1)*(l+nmax+2)/2  & 
-            + (nmax+n)*(l+1)+m+1
-    end if
-    return
-  end function index_wigner_array
 
   
   subroutine set_wigner_array(d,beta,lmax,nmax)
@@ -741,19 +724,19 @@ contains
     type(wigner_value) :: p
     call d%delete()
     d%lmax = lmax
-    d%nmax = nmax
-    d%ndim = d%index(lmax,nmax,lmax)
-    allocate(d%data(d%ndim))
-    d%allocated = .true.
+    d%nmax = nmax    
+    allocate(d%data((lmax+1)*(lmax+2)/2,-nmax:nmax))
     call p%init(beta,nmax,lmax)
     do l = 0,lmax
        call p%next()
-       do n = -min(l,nmax),min(l,nmax)
+       do n = -min(nmax,l),min(nmax,l)
           do m = 0,l
-             d%data(d%index(l,n,m)) = p%get(n,m)
-          end do          
+             i = l*(l+1)/2 + m + 1
+             d%data(i,n) = p%get(n,m)
+          end do
        end do
     end do
+
     call p%delete()    
     return
   end subroutine set_wigner_array

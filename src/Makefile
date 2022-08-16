@@ -14,8 +14,7 @@ F95 = gfortran
 FFTW3 = /home/david/lib/fftw-3.3.3/api
 
 # set the flags
-FFLAGS =   -I../mod  -J../mod -O3   -fbounds-check  -I$(FFTW3)
-#FFLAGS =   -I../mod  -J../mod -O3     -I$(FFTW3)
+FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3)
 
 
 

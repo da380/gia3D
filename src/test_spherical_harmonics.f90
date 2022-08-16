@@ -11,11 +11,12 @@ program test_spherical_harmonics
   type(gauss_legendre_grid) :: grid
   type(scalar_gauss_legendre_field) :: u
   type(scalar_spherical_harmonic_expansion) :: ulm
+  type(real_scalar_spherical_harmonic_expansion) :: vlm
   type(wigner_array) :: d
 
   ! make the GL-grid
   lmax = 512
-  nmax = 0
+  nmax = 1
   
   call grid%allocate(lmax,nmax)
 
@@ -25,21 +26,25 @@ program test_spherical_harmonics
 
  
   ! set the values for the field
-  do ith = 1,grid%nth()
+  do ith = 1,grid%nth
      th = grid%th(ith)
-     do iph = 1,grid%nph()
+     do iph = 1,grid%nph
         ph = grid%ph(iph)
-        u%data(u%index(iph,ith)) = 0.25_dp*sqrt(5.0_dp/pi)*(3.0_dp*cos(th)**2-1.0_dp) + sifourpi
+        u%data(u%index(iph,ith)) = 0.5*sqrt(3/pi)*cos(th)
      end do
   end do
   
-  
   ! allocate the expansion
   call ulm%allocate(lmax)
+  call vlm%allocate(lmax)
   
-  call cpu_time(start)
+
+
+
+
+  call cpu_time(start)  
   call grid%SH_trans(u,ulm)
-  call cpu_time(finish)
+  call cpu_time(finish)  
   print *, finish-start
 
   ilm = 0
@@ -53,6 +58,27 @@ program test_spherical_harmonics
         print *, l,-m,ulm%data(ilm)
      end do
   end do
+
+
+  
+  
+  call cpu_time(start)  
+  call grid%real_SH_trans(u,vlm)
+  call cpu_time(finish)  
+  print *, finish-start
+
+  ilm = 0
+  do l = 0,3
+     ilm = ilm+1
+     print *, l,0,vlm%data(ilm)
+     do m = 1,l
+        ilm = ilm+1
+        print *, l,m,vlm%data(ilm)
+     end do
+  end do
+  
+
+
   
   
 end program test_spherical_harmonics
