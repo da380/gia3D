@@ -712,8 +712,6 @@ contains
     return
   end subroutine delete_wigner_array
 
-
-
   
   subroutine set_wigner_array(d,beta,lmax,nmax)
     implicit none

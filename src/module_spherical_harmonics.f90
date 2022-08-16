@@ -27,8 +27,10 @@ module module_spherical_harmonics
      procedure :: check_field => check_field_gauss_legendre_grid
      procedure :: SH_trans_gauss_legendre_grid
      procedure :: SH_trans_scalar_gauss_legendre_grid
-     generic :: SH_trans => SH_trans_gauss_legendre_grid, &
-                            SH_trans_scalar_gauss_legendre_grid
+     procedure :: SH_trans_vector_gauss_legendre_grid
+     generic :: SH_trans => SH_trans_gauss_legendre_grid,        &
+                            SH_trans_scalar_gauss_legendre_grid, &
+                            SH_trans_vector_gauss_legendre_grid
      procedure :: real_SH_trans_gauss_legendre_grid
      procedure :: real_SH_trans_scalar_gauss_legendre_grid
      generic :: real_SH_trans => real_SH_trans_gauss_legendre_grid, & 
@@ -44,11 +46,11 @@ module module_spherical_harmonics
      logical :: allocated = .false.
      integer(i4b) :: lmax
      integer(i4b) :: ndim
+     integer(i4b) :: nth
+     integer(i4b) :: nph
      complex(dpc), dimension(:), allocatable :: data
    contains
      procedure :: delete => delete_gauss_legendre_field
-     procedure :: nth => nth_gauss_legendre_field
-     procedure :: nph => nph_gauss_legendre_field
      procedure :: check => check_gauss_legendre_field
      procedure :: assign_gauss_legendre_field
      generic, public :: assignment(=) => assign_gauss_legendre_field
@@ -71,7 +73,7 @@ module module_spherical_harmonics
      procedure :: saxpy_gauss_legendre_field
      procedure :: real_saxpy_gauss_legendre_field          
      generic   :: saxpy => saxpy_gauss_legendre_field,     &
-                          real_saxpy_gauss_legendre_field
+                           real_saxpy_gauss_legendre_field
   end type gauss_legendre_field
   
   
@@ -80,7 +82,21 @@ module module_spherical_harmonics
      procedure :: allocate => allocate_scalar_gauss_legendre_field
      procedure :: index => index_scalar_gauss_legendre_field
   end type scalar_gauss_legendre_field
+
   
+  type, extends(gauss_legendre_field) :: vector_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_vector_gauss_legendre_field
+     procedure :: index => index_vector_gauss_legendre_field
+  end type vector_gauss_legendre_field
+
+  
+  type, extends(gauss_legendre_field) :: real_vector_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_real_vector_gauss_legendre_field
+     procedure :: index => index_real_vector_gauss_legendre_field
+  end type real_vector_gauss_legendre_field
+
 
   !===============================================================!
   !                 type declarations SH expansions               !
@@ -119,7 +135,7 @@ module module_spherical_harmonics
      procedure :: saxpy_spherical_harmonic_expansion
      procedure :: real_saxpy_spherical_harmonic_expansion          
      generic   :: saxpy => saxpy_spherical_harmonic_expansion,     &
-                          real_saxpy_spherical_harmonic_expansion
+                           real_saxpy_spherical_harmonic_expansion
   end type spherical_harmonic_expansion
 
 
@@ -137,12 +153,30 @@ module module_spherical_harmonics
   end type real_scalar_spherical_harmonic_expansion
 
 
+  type, extends(spherical_harmonic_expansion) :: vector_spherical_harmonic_expansion
+   contains
+     procedure :: allocate => allocate_vector_spherical_harmonic_expansion
+     procedure :: index    => index_vector_spherical_harmonic_expansion
+  end type vector_spherical_harmonic_expansion
+
+
+  type, extends(spherical_harmonic_expansion) :: real_vector_spherical_harmonic_expansion
+   contains
+     procedure :: allocate => allocate_real_vector_spherical_harmonic_expansion
+     procedure :: index    => index_real_vector_spherical_harmonic_expansion
+  end type real_vector_spherical_harmonic_expansion
+  
      
 contains
 
   !=======================================================================!
   !                     procedures for the grid type                      !
   !=======================================================================!
+
+
+  !--------------------------------------!
+  !             basic routines           !
+  !--------------------------------------!
   
   subroutine delete_gauss_legendre_grid(grid)
     implicit none
@@ -246,7 +280,11 @@ contains
     check = check .and. (grid%lmax == u%lmax)    
     return
   end function check_field_gauss_legendre_grid
-  
+
+
+  !-----------------------------------------------------------------!
+  !            spherical harmonic transformation routines           !
+  !-----------------------------------------------------------------!
 
   subroutine SH_trans_gauss_legendre_grid(grid,n,u,ulm)
     use module_fftw3
@@ -367,15 +405,6 @@ contains
   end subroutine SH_trans_gauss_legendre_grid
 
 
-  subroutine SH_trans_scalar_gauss_legendre_grid(grid,u,ulm)
-    implicit none
-    class(gauss_legendre_grid), intent(in) :: grid
-    type(scalar_gauss_legendre_field), intent(in) :: u
-    type(scalar_spherical_harmonic_expansion), intent(inout) :: ulm
-    call grid%SH_trans(0,u%data,ulm%data)
-    return
-  end subroutine SH_trans_scalar_gauss_legendre_grid
-
   subroutine real_SH_trans_gauss_legendre_grid(grid,n,u,ulm)
     use module_fftw3
     implicit none
@@ -441,6 +470,19 @@ contains
   end subroutine real_SH_trans_gauss_legendre_grid
 
 
+  !-----------------------------------------------------------------!
+  !            spherical harmonic transformation wrappers           !
+  !-----------------------------------------------------------------!
+  
+  subroutine SH_trans_scalar_gauss_legendre_grid(grid,u,ulm)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    type(scalar_gauss_legendre_field), intent(in) :: u
+    type(scalar_spherical_harmonic_expansion), intent(inout) :: ulm
+    call grid%SH_trans(0,u%data,ulm%data)
+    return
+  end subroutine SH_trans_scalar_gauss_legendre_grid
+
   subroutine real_SH_trans_scalar_gauss_legendre_grid(grid,u,ulm)
     implicit none
     class(gauss_legendre_grid), intent(in) :: grid
@@ -449,6 +491,39 @@ contains
     call grid%real_SH_trans(0,u%data,ulm%data)
     return
   end subroutine real_SH_trans_scalar_gauss_legendre_grid
+  
+  subroutine SH_trans_vector_gauss_legendre_grid(grid,u,ulm)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    type(vector_gauss_legendre_field), intent(in) :: u
+    type(vector_spherical_harmonic_expansion), intent(inout) :: ulm
+    integer(i4b) :: i1,i2,j1,j2,alpha
+    do alpha = -1,1
+       i1 = u%index(alpha,1,1)
+       i2 = u%index(alpha,grid%nph,grid%nth)
+       j1 = ulm%index(alpha,0,0)
+       j2 = ulm%index(alpha,grid%lmax,-grid%lmax)
+       call grid%SH_trans(alpha,u%data(i1:i2),ulm%data(j1:j2))
+    end do
+    return
+  end subroutine SH_trans_vector_gauss_legendre_grid
+
+  
+  subroutine SH_trans_real_vector_gauss_legendre_grid(grid,u,ulm)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    type(real_vector_gauss_legendre_field), intent(in) :: u
+    type(real_vector_spherical_harmonic_expansion), intent(inout) :: ulm
+    integer(i4b) :: i1,i2,j1,j2,alpha
+    do alpha = -1,0
+       i1 = u%index(alpha,1,1)
+       i2 = u%index(alpha,grid%nph,grid%nth)
+       j1 = ulm%index(alpha,0,0)
+       j2 = ulm%index(alpha,grid%lmax,-grid%lmax)
+       call grid%real_SH_trans(alpha,u%data(i1:i2),ulm%data(j1:j2))
+    end do
+    return
+  end subroutine SH_trans_real_vector_gauss_legendre_grid
 
 
 
@@ -651,7 +726,9 @@ contains
     type(gauss_legendre_grid), intent(in) :: grid
     call self%delete()
     self%lmax = grid%lmax
-    self%ndim = grid%nph*grid%nth 
+    self%nth = grid%nth
+    self%nph = grid%nph
+    self%ndim = self%nph*self%nth 
     allocate(self%data(self%ndim))
     self%allocated = .true.
     return
@@ -662,9 +739,70 @@ contains
     class(scalar_gauss_legendre_field), intent(in) :: self
     integer(i4b), intent(in) :: iph,ith
     integer(i4b) :: i
-    i = self%nph()*(ith-1)+iph
+    i = self%nph*(ith-1)+iph
     return
   end function index_scalar_gauss_legendre_field
+
+
+
+  !-----------------------------------------------!
+  !                 vector fields                 !
+  !-----------------------------------------------!
+
+
+  subroutine allocate_vector_gauss_legendre_field(self,grid)
+    implicit none
+    class(vector_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call self%delete()
+    self%lmax = grid%lmax
+    self%nth = grid%nth
+    self%nph = grid%nph
+    self%ndim = self%nph*self%nth 
+    self%ndim = 3*self%ndim
+    allocate(self%data(self%ndim))
+    self%allocated = .true.
+    return
+  end subroutine allocate_vector_gauss_legendre_field
+
+  function index_vector_gauss_legendre_field(self,alpha,iph,ith) result(i)
+    implicit none
+    class(vector_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: alpha,iph,ith
+    integer(i4b) :: i
+    i = self%nph*(ith-1)+iph+(alpha+1)*self%nph*self%nth
+    return
+  end function index_vector_gauss_legendre_field
+
+
+  !-----------------------------------------------!
+  !                real vector fields             !
+  !-----------------------------------------------!
+
+
+  subroutine allocate_real_vector_gauss_legendre_field(self,grid)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call self%delete()
+    self%lmax = grid%lmax
+    self%nth = grid%nth
+    self%nph = grid%nph
+    self%ndim = self%nph*self%nth 
+    self%ndim = 2*self%ndim
+    allocate(self%data(self%ndim))
+    self%allocated = .true.
+    return
+  end subroutine allocate_real_vector_gauss_legendre_field
+
+  function index_real_vector_gauss_legendre_field(self,alpha,iph,ith) result(i)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: alpha,iph,ith
+    integer(i4b) :: i
+    i = self%nph*(ith-1)+iph+(alpha+1)*self%nph*self%nth
+    return
+  end function index_real_vector_gauss_legendre_field
 
   
   !=======================================================================!
@@ -938,6 +1076,78 @@ contains
     i = (l*(l+1))/2 + m + 1
     return
   end function index_real_scalar_spherical_harmonic_expansion
+
+
+  !-----------------------------------------------!
+  !                 vector fields                 !
+  !-----------------------------------------------!
+
+  subroutine allocate_vector_spherical_harmonic_expansion(self,lmax)
+    implicit none
+    class(vector_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: lmax
+    call self%delete()
+    self%lmax = lmax
+    self%nmax = 0
+    self%ndim = (lmax+1)**2
+    self%ndim = 3*self%ndim
+    allocate(self%data(self%ndim))
+    self%data = 0.0_dp
+    self%allocated = .true.
+    return
+  end subroutine allocate_vector_spherical_harmonic_expansion
+
+
+  function index_vector_spherical_harmonic_expansion(self,alpha,l,m) result(i)
+    implicit none
+    class(vector_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: alpha,l,m
+    integer(i4b) :: i
+    i = l**2
+    if(m == 0) then
+       i = i+1
+    else if(m > 0) then
+       i = i + 2*m
+    else
+       i = i -2*m+1
+    end if
+    i = i + (1+alpha)*(self%ndim/3)
+    return
+  end function index_vector_spherical_harmonic_expansion
+
+
+  !-----------------------------------------------!
+  !             real vector fields                !
+  !-----------------------------------------------!
+
+  
+  subroutine allocate_real_vector_spherical_harmonic_expansion(self,lmax)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: lmax
+    call self%delete()
+    self%lmax = lmax
+    self%nmax = 0
+    self%ndim = ((lmax+1)*(lmax+2))/2
+    self%ndim = 2*self%ndim
+    allocate(self%data(self%ndim))
+    self%data = 0.0_dp
+    self%allocated = .true.
+    return
+  end subroutine allocate_real_vector_spherical_harmonic_expansion
+
+
+  function index_real_vector_spherical_harmonic_expansion(self,alpha,l,m) result(i)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: alpha,l,m
+    integer(i4b) :: i
+    i = (l*(l+1))/2 + m + 1 + (alpha+1)*(self%ndim/2)
+    return
+  end function index_real_vector_spherical_harmonic_expansion
+
+
+
   
 end module module_spherical_harmonics
 
