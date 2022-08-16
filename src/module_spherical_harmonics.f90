@@ -1,7 +1,7 @@
 module module_spherical_harmonics
   
   use module_constants
-  use module_error
+!  use module_error
   use module_special_functions
   use, intrinsic :: iso_c_binding
 
@@ -332,9 +332,9 @@ contains
          ulm%data(ilm) = fac*ulm%data(ilm)
        end do
     end do
+    
     return
   end subroutine SH_trans_scalar_spherical_harmonic_expansion
-
 
 
   !=======================================================================!
@@ -410,7 +410,6 @@ contains
     class(gauss_legendre_field), intent(in) :: self
     class(gauss_legendre_field), intent(in) :: other
     class(gauss_legendre_field), allocatable :: new
-    call error(.not.self%check(other),'add_gauss_legendre_field','incompatible inputs')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -424,7 +423,6 @@ contains
     class(gauss_legendre_field), intent(in) :: self
     class(gauss_legendre_field), intent(in) :: other
     class(gauss_legendre_field), allocatable :: new
-    call error(.not.self%check(other),'subtract_gauss_legendre_field','incompatible inputs')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -438,12 +436,12 @@ contains
     complex(dpc), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: self
     class(gauss_legendre_field), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
     new%ndim = self%ndim
-    new%data = a*self%data
+    call zcopy(new%ndim,self%data,1,new%data,1)
+    call zscal(new%ndim,a,new%data,1)
     return
   end function left_multiply_gauss_legendre_field
 
@@ -452,12 +450,12 @@ contains
     complex(dpc), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: self
     class(gauss_legendre_field), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
     new%ndim = self%ndim
-    new%data = a*self%data
+    call zcopy(new%ndim,self%data,1,new%data,1)
+    call zscal(new%ndim,a,new%data,1)
     return
   end function right_multiply_gauss_legendre_field
 
@@ -466,12 +464,12 @@ contains
     real(dp), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: self
     class(gauss_legendre_field), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
     new%ndim = self%ndim
-    new%data = a*self%data
+    call zcopy(new%ndim,self%data,1,new%data,1)
+    call zdscal(new%ndim,a,new%data,1)
     return
   end function real_left_multiply_gauss_legendre_field
 
@@ -480,12 +478,12 @@ contains
     real(dp), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: self
     class(gauss_legendre_field), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_gauss_legendre_field','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
     new%ndim = self%ndim
-    new%data = a*self%data
+    call zcopy(new%ndim,self%data,1,new%data,1)
+    call zdscal(new%ndim,a,new%data,1)
     return
   end function real_right_multiply_gauss_legendre_field
 
@@ -493,8 +491,7 @@ contains
     implicit none
     class(gauss_legendre_field), intent(inout) :: self
     complex(dpc), intent(in) :: a
-    call error(.not.self%allocated,'scale_gauss_legendre_field','not allocated')    
-    self%data = a*self%data
+    call zscal(self%ndim,a,self%data,1)
     return
   end subroutine scale_gauss_legendre_field
 
@@ -502,8 +499,7 @@ contains
     implicit none
     class(gauss_legendre_field), intent(inout) :: self
     real(dp), intent(in) :: a
-    call error(.not.self%allocated,'real_scale_gauss_legendre_field','not allocated')
-    self%data = a*self%data
+    call zdscal(self%ndim,a,self%data,1)
     return
   end subroutine real_scale_gauss_legendre_field
 
@@ -512,9 +508,7 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     complex(dpc), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: other
-    call error(.not.self%check(other),'saxpy_gauss_legendre_field', &
-                                      'incompatible inputs')
-    self%data = a*self%data + other%data
+    call zaxpy(self%ndim,a,other%data,1,self%data,1)
     return
   end subroutine saxpy_gauss_legendre_field
 
@@ -523,20 +517,15 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     real(dp), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: other
-    call error(.not.self%check(other),'real_saxpy_gauss_legendre_field', &
-                                      'incompatible inputs')
-    self%data = a*self%data + other%data
+    complex(dpc) :: aloc
+    aloc = a
+    call zaxpy(self%ndim,aloc,other%data,1,self%data,1)
     return
   end subroutine real_saxpy_gauss_legendre_field
-
-
-
   
   !-----------------------------------------------!
   !                 scalar fields                 !
   !-----------------------------------------------!
-  
-
 
 
   subroutine allocate_scalar_gauss_legendre_field(self,grid)
@@ -544,7 +533,6 @@ contains
     class(scalar_gauss_legendre_field), intent(inout) :: self
     type(gauss_legendre_grid), intent(in) :: grid
     call self%delete()
-    call error(.not.grid%allocated,'allocate_scalar_gauss_legendre_field','grid not allocated')
     self%lmax = grid%lmax
     self%ndim = grid%nph()*grid%nth() 
     allocate(self%data(self%ndim))
@@ -557,16 +545,10 @@ contains
     class(scalar_gauss_legendre_field), intent(in) :: self
     integer(i4b), intent(in) :: iph,ith
     integer(i4b) :: i
-    call error(.not.self%allocated,'index_scalar_gauss_legendre_field','field not allocated')
-    call error(iph < 1 .or. iph > self%nph(), 'index_scalar_gauss_legendre_field','iph out of range')
-    call error(ith < 1 .or. ith > self%nth(), 'index_scalar_gauss_legendre_field','iph out of range')
     i = self%nph()*(ith-1)+iph
     return
   end function index_scalar_gauss_legendre_field
 
-  
-
-  
   
   !=======================================================================!
   !          procedures for the spherical_harmonic_expansion type         !
@@ -641,7 +623,6 @@ contains
     class(spherical_harmonic_expansion), intent(in) :: self
     class(spherical_harmonic_expansion), intent(in) :: other
     class(spherical_harmonic_expansion), allocatable :: new
-    call error(.not.self%check(other),'add_spherical_harmonic_expansion','incompatible inputs')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -658,7 +639,6 @@ contains
     class(spherical_harmonic_expansion), intent(in) :: self
     class(spherical_harmonic_expansion), intent(in) :: other
     class(spherical_harmonic_expansion), allocatable :: new
-    call error(.not.self%check(other),'subtract_spherical_harmonic_expansion','incompatible inputs')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -675,7 +655,6 @@ contains
     complex(dpc), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: self
     class(spherical_harmonic_expansion), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_spherical_harmonic_expansion','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -683,7 +662,8 @@ contains
     new%ndim = self%ndim
     new%s    = self%s
     new%mu   = self%mu
-    new%data = a*self%data
+    call zcopy(self%ndim,self%data,1,new%data,1)
+    call zscal(new%ndim,a,new%data,1)
     return
   end function left_multiply_spherical_harmonic_expansion
 
@@ -692,7 +672,6 @@ contains
     complex(dpc), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: self
     class(spherical_harmonic_expansion), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_spherical_harmonic_expansion','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -700,7 +679,8 @@ contains
     new%ndim = self%ndim
     new%s    = self%s
     new%mu   = self%mu
-    new%data = a*self%data
+    call zcopy(self%ndim,self%data,1,new%data,1)
+    call zscal(new%ndim,a,new%data,1)
     return
   end function right_multiply_spherical_harmonic_expansion
 
@@ -709,7 +689,6 @@ contains
     real(dp), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: self
     class(spherical_harmonic_expansion), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_spherical_harmonic_expansion','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -717,7 +696,8 @@ contains
     new%ndim = self%ndim
     new%s    = self%s
     new%mu   = self%mu
-    new%data = a*self%data
+    call zcopy(self%ndim,self%data,1,new%data,1)
+    call zdscal(new%ndim,a,new%data,1)
     return
   end function real_left_multiply_spherical_harmonic_expansion
 
@@ -726,7 +706,6 @@ contains
     real(dp), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: self
     class(spherical_harmonic_expansion), allocatable :: new
-    call error(.not.self%allocated,'left_multiply_spherical_harmonic_expansion','bad input')
     allocate(new,source = self)
     new%allocated = .true.
     new%lmax = self%lmax
@@ -734,7 +713,8 @@ contains
     new%ndim = self%ndim
     new%s    = self%s
     new%mu   = self%mu
-    new%data = a*self%data
+    call zcopy(self%ndim,self%data,1,new%data,1)
+    call zdscal(new%ndim,a,new%data,1)
     return
   end function real_right_multiply_spherical_harmonic_expansion
 
@@ -742,8 +722,7 @@ contains
     implicit none
     class(spherical_harmonic_expansion), intent(inout) :: self
     complex(dpc), intent(in) :: a
-    call error(.not.self%allocated,'scale_spherical_harmonic_expansion','not allocated')    
-    self%data = a*self%data
+    call zscal(self%ndim,a,self%data,1)
     return
   end subroutine scale_spherical_harmonic_expansion
 
@@ -751,8 +730,7 @@ contains
     implicit none
     class(spherical_harmonic_expansion), intent(inout) :: self
     real(dp), intent(in) :: a
-    call error(.not.self%allocated,'real_scale_spherical_harmonic_expansion','not allocated')
-    self%data = a*self%data
+    call zdscal(self%ndim,a,self%data,1)
     return
   end subroutine real_scale_spherical_harmonic_expansion
 
@@ -761,9 +739,7 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     complex(dpc), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: other
-    call error(.not.self%check(other),'saxpy_spherical_harmonic_expansion', &
-                                      'incompatible inputs')
-    self%data = a*self%data + other%data
+    call zaxpy(self%ndim,a,other%data,1,self%data,1)
     return
   end subroutine saxpy_spherical_harmonic_expansion
 
@@ -772,9 +748,9 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     real(dp), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: other
-    call error(.not.self%check(other),'real_saxpy_spherical_harmonic_expansion', &
-                                      'incompatible inputs')
-    self%data = a*self%data + other%data
+    complex(dpc) :: aloc
+    aloc = a
+    call zaxpy(self%ndim,aloc,other%data,1,self%data,1)
     return
   end subroutine real_saxpy_spherical_harmonic_expansion
 
@@ -817,7 +793,6 @@ contains
   subroutine conjg_scalar_spherical_harmonic_expansion(self)
     implicit none
     class(scalar_spherical_harmonic_expansion), intent(inout) :: self
-    call error(.not.self%allocated,'conjg_scalar_spherical_harmonic_expansion','not allocated')
     self%data = conjg(self%data)
     return
   end subroutine conjg_scalar_spherical_harmonic_expansion

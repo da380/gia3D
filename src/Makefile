@@ -9,14 +9,18 @@ VPATH = $(BIN):$(LOBJ)
 # set the compiler 
 F95 = gfortran
 
+
 # fftw3 f90 location
 FFTW3 = /home/david/lib/fftw-3.3.3/api
 
 # set the flags
-FFLAGS =   -I../mod  -J../mod -O5  -fbounds-check  -I$(FFTW3)
+FFLAGS =   -I../mod  -J../mod -O3   -fbounds-check  -I$(FFTW3)
+#FFLAGS =   -I../mod  -J../mod -O3     -I$(FFTW3)
+
+
 
 # libraries to link to
-LIBS =  -l lapack -lfftw3
+LIBS =  -llapack -lfftw3 -lblas
 
 # set some parameters
 MV=mv -f

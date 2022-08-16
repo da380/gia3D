@@ -42,17 +42,17 @@ program test_spherical_harmonics
   call cpu_time(finish)
   print *, finish-start
 
-!  ilm = 0
-!  do l = 0,3
-!     ilm = ilm+1
-!     print *, l,0,ulm%data(ilm)
-!     do m = 1,l
-!        ilm = ilm+1
-!        print *, l,m,ulm%data(ilm)
-!        ilm = ilm+1
-!        print *, l,-m,ulm%data(ilm)
-!     end do
-!  end do
+  ilm = 0
+  do l = 0,3
+     ilm = ilm+1
+     print *, l,0,ulm%data(ilm)
+     do m = 1,l
+        ilm = ilm+1
+        print *, l,m,ulm%data(ilm)
+        ilm = ilm+1
+        print *, l,-m,ulm%data(ilm)
+     end do
+  end do
   
   
 end program test_spherical_harmonics
