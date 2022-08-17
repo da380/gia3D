@@ -713,12 +713,14 @@ contains
   end subroutine delete_wigner_array
 
   
-  subroutine set_wigner_array(d,beta,lmax,nmax)
+  subroutine set_wigner_array(d,beta,lmax,nmax,norm)
     implicit none
     class(wigner_array), intent(inout) :: d    
     real(dp), intent(in) :: beta
     integer(i4b), intent(in) :: nmax,lmax
+    logical, intent(in), optional :: norm
     integer(i4b) :: l,i,n,m
+    real(dp) :: fac
     type(wigner_value) :: p
     call d%delete()
     d%lmax = lmax
@@ -727,10 +729,14 @@ contains
     call p%init(beta,nmax,lmax)
     do l = 0,lmax
        call p%next()
+       fac = 1.0_dp
+       if(present(norm)) then
+          if(norm) fac = sqrt((2*l+1)/fourpi)
+       end if
        do n = -min(nmax,l),min(nmax,l)
           do m = 0,l
              i = l*(l+1)/2 + m + 1
-             d%data(i,n) = p%get(n,m)
+             d%data(i,n) = fac*p%get(n,m)
           end do
        end do
     end do
