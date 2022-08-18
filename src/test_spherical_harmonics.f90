@@ -6,9 +6,9 @@ program test_spherical_harmonics
   use module_fftw3
   implicit none
 
-  integer(i4b) :: lmax,nmax,n,l,m,ith,iph,ilm,k,klm,alpha
-  real(dp) :: start,finish,th,ph,rand1,rand2
-  complex(dpc) :: fun
+  integer(i4b) :: lmax,nmax,n,l,m,ith,iph,ilm,k,klm,alpha,i
+  real(dp) :: start,finish,th,ph,rand1,rand2,rfun
+  complex(dpc) :: cfun
   type(wigner_value) :: d
   type(gauss_legendre_grid) :: grid
 
@@ -21,14 +21,19 @@ program test_spherical_harmonics
   type(vector_spherical_harmonic_expansion) :: wlm,xlm
 
   ! real vector fields
-  type(real_vector_gauss_legendre_field) :: y,z
-  type(real_vector_spherical_harmonic_expansion) :: ylm,zlm
-
-
-  ! set the expansion degree
+  type(vector_gauss_legendre_field) :: y,z
+  type(vector_spherical_harmonic_expansion) :: ylm,zlm
+ 
+  ! make the grid  
   lmax = 512
-  
+  nmax = 1
+  print *, 'building the grid for degree ',lmax
+  call cpu_time(start)
+  call grid%allocate(lmax,nmax)  
+  call cpu_time(finish)
+  print *, 'assembly time = ',finish-start
 
+  
   !=============================================================!
   !=============================================================!
   !                   tests for scalar fields                   !
@@ -39,11 +44,6 @@ program test_spherical_harmonics
   print *, '#             scalar field tests            #'
   print *, '#############################################'
   
-  ! make the GL-grid
-  nmax = 0  
-  call grid%allocate(lmax,nmax)
-
-
   !=============================================================!
   !            test coefficient to function and back            !
   !=============================================================!
@@ -59,8 +59,8 @@ program test_spherical_harmonics
         call random_number(rand2)
         rand1 = 2.0_dp*(rand1-0.5_dp)
         rand2 = 2.0_dp*(rand2-0.5_dp)
-        fun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-        call ulm%set(l,m,fun)
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call ulm%set(l,m,cfun)
      end do
   end do
 
@@ -75,18 +75,6 @@ program test_spherical_harmonics
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
 
-  
-  ! write out the scalar field
-  open(99,file='scalar.dat')
-  write(99,*) grid%nth,grid%nph,0.0_dp
-  do ith = 1,grid%nth
-     th = grid%th(ith)
-     do iph = 1,grid%nph
-        ph = grid%ph(iph)
-        write(99,*) ph,th,real(u%get(iph,ith))
-     end do
-  end do
-  close(99)
 
   ! now transform back again
   call vlm%allocate(grid)
@@ -95,7 +83,7 @@ program test_spherical_harmonics
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
   
-  print *, 'error in coefficients = ', maxval(abs(ulm%data-vlm%data))
+  print *, 'error in coefficients = ', maxval(abs(ulm%cdata-vlm%cdata))
   print *, '-----------------------------------------'
 
 
@@ -105,28 +93,27 @@ program test_spherical_harmonics
   !=============================================================!
   
   ! set a function
-  l = 5
-  m = -3
+  l = lmax-2
+  m = -lmax/4
   klm = l*(l+1)/2 + abs(m) + 1
   do ith = 1,grid%nth
      th = grid%th(ith)
      do iph = 1,grid%nph
         ph = grid%ph(iph)
         if(m >= 0) then
-           fun = grid%dlm(klm,0,ith)*exp(ii*m*ph)
+           cfun = grid%dlm(klm,0,ith)*exp(ii*m*ph)
         else
-           fun = (-1)**m*grid%dlm(klm,0,ith)*exp(ii*m*ph)
+           cfun = (-1)**m*grid%dlm(klm,0,ith)*exp(ii*m*ph)
         end if
-        call u%set(iph,ith,fun)
+        call u%set(iph,ith,cfun)
      end do
   end do
-
+ 
   ! compute the transform
   call cpu_time(start)
   call grid%SH_trans(u,ulm)
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
-
 
   print *, '(l,m)th coefficient  = ', ulm%get(l,m)
   
@@ -136,21 +123,99 @@ program test_spherical_harmonics
   call grid%SH_itrans(ulm,v)
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
+  
+  print *, 'error in point values = ', maxval(abs(u%cdata-v%cdata))
 
-  ! write out the difference field
-  open(99,file='scalar_dif.dat')
-  write(99,*) grid%nth,grid%nph,0.0_dp
+
+  print *, '#############################################'
+  print *, '#           real  scalar field tests        #'
+  print *, '#############################################'
+  
+  !=============================================================!
+  !            test coefficient to function and back            !
+  !=============================================================!
+  
+  ! allocate a coefficient array
+  call ulm%allocate(grid,real = .true.)
+
+  ! set values for the coefficients
+  do l = 0,lmax
+     do m = 0,l
+        call random_number(rand1)
+        call random_number(rand2)
+        rand1 = 2.0_dp*(rand1-0.5_dp)
+        if(m == 0 .or. m == lmax) then
+           rand2 = 0
+        else
+           call random_number(rand2)
+           rand2 = 2.0_dp*(rand2-0.5_dp)
+        end if
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call ulm%set(l,m,cfun)
+     end do
+  end do
+
+  ! allocate a scalar field
+  call u%allocate(grid,real=.true.)
+
+  
+  ! do an inverse transformation
+  call cpu_time(start)
+  call grid%SH_itrans(ulm,u)
+  call cpu_time(finish)
+  print *, 'transformation time = ',finish-start
+
+  
+  ! now transform back again
+  call vlm%allocate(grid,real=.true.)
+  call cpu_time(start)
+  call grid%SH_trans(u,vlm)
+  call cpu_time(finish)
+  print *, 'transformation time = ',finish-start
+  
+  print *, 'error in coefficients = ', maxval(abs(ulm%rdata-vlm%rdata))
+  print *, '-----------------------------------------'
+
+
+
+  !=============================================================!
+  !            test function to coefficient and back            !
+  !=============================================================!
+  
+  ! set a function
+  l = lmax
+  m = lmax/2
+  klm = l*(l+1)/2 + abs(m) + 1
   do ith = 1,grid%nth
      th = grid%th(ith)
      do iph = 1,grid%nph
-        ph = grid%ph(iph)       
-        write(99,*) ph,th,abs(u%get(iph,ith)- v%get(iph,ith))
+        ph = grid%ph(iph)
+        if(m >= 0) then
+           cfun = grid%dlm(klm,0,ith)*exp(ii*m*ph)
+        else
+           cfun = (-1)**m*grid%dlm(klm,0,ith)*exp(ii*m*ph)
+        end if
+        rfun = real(cfun)
+        call u%set(iph,ith,rfun)
      end do
   end do
-  close(99)
-  
-  print *, 'error in point values = ', maxval(abs(u%data-v%data))
 
+  ! compute the transform
+  call cpu_time(start)
+  call grid%SH_trans(u,ulm)
+  call cpu_time(finish)
+  print *, 'transformation time = ',finish-start
+
+  print *, '(l,m)th coefficient  = ', ulm%get(l,m)
+  
+  ! transform back
+  call v%allocate(grid,real=.true.)
+  call cpu_time(start)
+  call grid%SH_itrans(ulm,v)
+  call cpu_time(finish)
+  print *, 'transformation time = ',finish-start
+  
+  print *, 'error in point values = ', maxval(abs(u%rdata-v%rdata))
 
   
   print *, '#############################################'
@@ -164,9 +229,6 @@ program test_spherical_harmonics
   !=============================================================!
 
 
-  ! make the GL-grid
-  nmax = 1
-  call grid%allocate(lmax,nmax)
 
 
   !=============================================================!
@@ -186,23 +248,23 @@ program test_spherical_harmonics
         call random_number(rand2)
         rand1 = 2.0_dp*(rand1-0.5_dp)
         rand2 = 2.0_dp*(rand2-0.5_dp)
-        fun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-        call wlm%set(l,m,0,fun)
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call wlm%set(l,m,0,cfun)
         if(l == 0) cycle
         ! set alpha = -1 component
         call random_number(rand1)
         call random_number(rand2)
         rand1 = 2.0_dp*(rand1-0.5_dp)
         rand2 = 2.0_dp*(rand2-0.5_dp)
-        fun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-        call wlm%set(l,m,-1,fun)
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call wlm%set(l,m,-1,cfun)
         ! set alpha = +1 component
         call random_number(rand1)
         call random_number(rand2)
         rand1 = 2.0_dp*(rand1-0.5_dp)
         rand2 = 2.0_dp*(rand2-0.5_dp)
-        fun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-        call wlm%set(l,m,1,fun)
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call wlm%set(l,m,1,cfun)
      end do
   end do
   
@@ -216,18 +278,6 @@ program test_spherical_harmonics
   print *, 'transformation time = ',finish-start
 
 
-  ! write out the vector field
-  open(99,file='vector.dat')
-  write(99,*) grid%nth,grid%nph,0.0_dp
-  do ith = 1,grid%nth
-     th = grid%th(ith)
-     do iph = 1,grid%nph
-        ph = grid%ph(iph)
-        write(99,*) ph,th,real(w%get(iph,ith,0))
-     end do
-  end do
-  close(99)
-
   ! now transform back again
   call xlm%allocate(grid)
   call cpu_time(start)
@@ -235,7 +285,7 @@ program test_spherical_harmonics
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
 
-  print *, 'error in coefficients = ', maxval(abs(wlm%data-xlm%data))
+  print *, 'error in coefficients = ', maxval(abs(wlm%cdata-xlm%cdata))
   print *, '-----------------------------------------'
 
 
@@ -253,11 +303,11 @@ program test_spherical_harmonics
      do iph = 1,grid%nph
         ph = grid%ph(iph)
         if(m >= 0) then
-           fun = grid%dlm(klm,alpha,ith)*exp(ii*m*ph)
+           cfun = grid%dlm(klm,alpha,ith)*exp(ii*m*ph)
         else
-           fun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
+           cfun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
         end if
-        call w%set(iph,ith,alpha,fun)
+        call w%set(iph,ith,alpha,cfun)
      end do
   end do
 
@@ -277,19 +327,8 @@ program test_spherical_harmonics
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
 
-  ! write out the difference field
-  open(99,file='vector_dif.dat')
-  write(99,*) grid%nth,grid%nph,0.0_dp
-  do ith = 1,grid%nth
-     th = grid%th(ith)
-     do iph = 1,grid%nph
-        ph = grid%ph(iph)       
-        write(99,*) ph,th,real(w%get(iph,ith,alpha)- x%get(iph,ith,alpha))
-     end do
-  end do
-  close(99)
   
-  print *, 'error in point values = ', maxval(abs(w%data-x%data))
+  print *, 'error in point values = ', maxval(abs(w%cdata-x%cdata))
 
   
 
@@ -297,6 +336,8 @@ program test_spherical_harmonics
   print *, '#          real vector field tests          #'
   print *, '#############################################'
 
+
+  
   !=============================================================!
   !=============================================================!
   !                   tests for vector fields                   !
@@ -307,36 +348,69 @@ program test_spherical_harmonics
   !=============================================================!
   !            test coefficient to function and back            !
   !=============================================================!
+
+
   
   ! allocate a coefficient array
-  call ylm%allocate(grid)
+  call ylm%allocate(grid,real = .true.)
 
   
   ! set values for the coefficients
   do l = 0,lmax
-     do m = -l,l
-        if(m == -lmax) cycle
-        ! set alpha = 0 component
+     ! alpha = 0, m = 0
+     call random_number(rand1)
+     rand1 = 2.0_dp*(rand1-0.5_dp)
+     rand2 = 0.0_dp
+     cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+     call ylm%set(l,0,0,cfun)
+     ! alpha = -1, m = 0
+     call random_number(rand1)
+     call random_number(rand2)
+     rand1 = 2.0_dp*(rand1-0.5_dp)
+     rand2 = 2.0_dp*(rand2-0.5_dp)
+     cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+     if(l > 0) call ylm%set(l,0,-1,cfun)        
+     do m = 1,l
+
+        ! do alpha = 0, m positive
+        call random_number(rand1)
+        rand1 = 2.0_dp*(rand1-0.5_dp)
+        if(m == lmax) then
+           rand2 = 0.0_dp
+        else
+           call random_number(rand2)
+           rand2 = 2.0_dp*(rand2-0.5_dp)
+        end if
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call ylm%set(l,m,0,cfun)
+
+        ! do alpha = -1, m positive
         call random_number(rand1)
         call random_number(rand2)
         rand1 = 2.0_dp*(rand1-0.5_dp)
         rand2 = 2.0_dp*(rand2-0.5_dp)
-        fun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-        call ylm%set(l,m,0,fun)
-        if(l == 0) cycle
-        ! set alpha = -1 component
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        call ylm%set(l,m,-1,cfun)
+
+        ! do alpha = -1, m negative
         call random_number(rand1)
         call random_number(rand2)
         rand1 = 2.0_dp*(rand1-0.5_dp)
         rand2 = 2.0_dp*(rand2-0.5_dp)
-        fun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-        call ylm%set(l,m,-1,fun)        
+        cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+        if(m < lmax) call ylm%set(l,-m,-1,cfun)
+        
      end do
+     
   end do
+
+
+
   
   ! allocate a real vector field
-  call y%allocate(grid)
+  call y%allocate(grid,real = .true.)
 
+  
   ! do an inverse transformation
   call cpu_time(start)
   call grid%SH_itrans(ylm,y)
@@ -344,26 +418,14 @@ program test_spherical_harmonics
   print *, 'transformation time = ',finish-start
 
 
-  ! write out the vector field
-  open(99,file='real_vector.dat')
-  write(99,*) grid%nth,grid%nph,0.0_dp
-  do ith = 1,grid%nth
-     th = grid%th(ith)
-     do iph = 1,grid%nph
-        ph = grid%ph(iph)
-        write(99,*) ph,th,real(y%get(iph,ith,0))
-     end do
-  end do
-  close(99)
-
   ! now transform back again
-  call zlm%allocate(grid)
+  call zlm%allocate(grid,real = .true.)
   call cpu_time(start)
   call grid%SH_trans(y,zlm)
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
 
-  print *, 'error in coefficients = ', maxval(abs(ylm%data-zlm%data))
+  print *, 'error in coefficients = ', maxval(abs(ylm%cdata-zlm%cdata))
   print *, '-----------------------------------------'
 
 
@@ -372,20 +434,21 @@ program test_spherical_harmonics
   !=============================================================!
   
   ! set a function
+  alpha = 0
   l = lmax-1
   m = -lmax/4
-  alpha = 0
+  if(alpha == 0) m = abs(m)
   klm = l*(l+1)/2 + abs(m) + 1
   do ith = 1,grid%nth
      th = grid%th(ith)
      do iph = 1,grid%nph
         ph = grid%ph(iph)
         if(m >= 0) then
-           fun = grid%dlm(klm,alpha,ith)*exp(ii*m*ph)
+           cfun = grid%dlm(klm,alpha,ith)*exp(ii*m*ph)
         else
-           fun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
+           cfun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
         end if
-        call y%set(iph,ith,alpha,fun)
+        call y%set(iph,ith,alpha,cfun)
      end do
   end do
 
@@ -400,25 +463,14 @@ program test_spherical_harmonics
 
   
   ! transform back
-  call z%allocate(grid)
+  call z%allocate(grid,real = .true.)
   call cpu_time(start)
   call grid%SH_itrans(ylm,z)
   call cpu_time(finish)
   print *, 'transformation time = ',finish-start
 
-  ! write out the difference field
-  open(99,file='real_vector_dif.dat')
-  write(99,*) grid%nth,grid%nph,0.0_dp
-  do ith = 1,grid%nth
-     th = grid%th(ith)
-     do iph = 1,grid%nph
-        ph = grid%ph(iph)       
-        write(99,*) ph,th,real(y%get(iph,ith,alpha)-z%get(iph,ith,alpha))
-     end do
-  end do
-  close(99)
-  
-  print *, 'error in point values = ', maxval(abs(y%data-z%data))
+
+  print *, 'error in point values = ', maxval(abs(y%cdata-z%cdata))
 
 
 
