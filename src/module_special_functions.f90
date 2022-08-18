@@ -122,15 +122,7 @@ module module_special_functions
              get_single_wigner_value
 
 
-  type wigner_array
-     logical :: allocated  = .false.
-     integer(i4b) :: lmax
-     integer(i4b) :: nmax
-     real(dp), dimension(:,:), allocatable :: data
-   contains
-     procedure :: delete => delete_wigner_array
-     procedure :: set => set_wigner_array
-  end type wigner_array
+
   
 
 contains
@@ -703,29 +695,17 @@ contains
   end function get_slice_wigner_value
 
 
-  subroutine delete_wigner_array(d)
-    implicit none
-    class(wigner_array), intent(inout) :: d
-    if(.not.d%allocated) return
-    deallocate(d%data)
-    d%allocated = .false.
-    return
-  end subroutine delete_wigner_array
 
   
-  subroutine set_wigner_array(d,beta,lmax,nmax,norm)
+  subroutine set_wigner_array(beta,lmax,nmax,dlm,norm)
     implicit none
-    class(wigner_array), intent(inout) :: d    
     real(dp), intent(in) :: beta
     integer(i4b), intent(in) :: nmax,lmax
+    real(dp), dimension((lmax+1)*(lmax+2)/2,-nmax:nmax), intent(out) :: dlm
     logical, intent(in), optional :: norm
     integer(i4b) :: l,i,n,m
     real(dp) :: fac
-    type(wigner_value) :: p
-    call d%delete()
-    d%lmax = lmax
-    d%nmax = nmax    
-    allocate(d%data((lmax+1)*(lmax+2)/2,-nmax:nmax))
+    type(wigner_value) :: p    
     call p%init(beta,nmax,lmax)
     do l = 0,lmax
        call p%next()
@@ -736,7 +716,7 @@ contains
        do n = -min(nmax,l),min(nmax,l)
           do m = 0,l
              i = l*(l+1)/2 + m + 1
-             d%data(i,n) = fac*p%get(n,m)
+             dlm(i,n) = fac*p%get(n,m)
           end do
        end do
     end do

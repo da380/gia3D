@@ -17,22 +17,18 @@ module module_spherical_harmonics
      integer(i4b) :: nph
      real(dp), dimension(:), allocatable :: th
      real(dp), dimension(:), allocatable :: w
-     type(wigner_array), dimension(:), allocatable :: d
+     real(dp), dimension(:,:,:), allocatable :: dlm
      type(C_PTR) :: plan_forward
      type(C_PTR) :: plan_backward     
    contains
-     procedure :: delete  => delete_gauss_legendre_grid
-     procedure :: allocate   =>  allocate_gauss_legendre_grid
-     procedure :: ph  =>  ph_gauss_legednre_grid
+     procedure :: delete => delete_gauss_legendre_grid
+     procedure :: allocate =>  allocate_gauss_legendre_grid
+     procedure :: ph =>  ph_gauss_legednre_grid
      procedure :: check_field => check_field_gauss_legendre_grid
      procedure :: SH_trans_gauss_legendre_grid
      procedure :: wrapper_SH_trans_gauss_legendre_grid
      generic :: SH_trans => SH_trans_gauss_legendre_grid,        &
                             wrapper_SH_trans_gauss_legendre_grid
-     procedure :: real_SH_trans_gauss_legendre_grid
-     procedure :: wrapper_real_SH_trans_gauss_legendre_grid
-     generic :: real_SH_trans => real_SH_trans_gauss_legendre_grid,        &
-                                 wrapper_real_SH_trans_gauss_legendre_grid
      procedure :: SH_itrans_gauss_legendre_grid
      procedure :: wrapper_SH_itrans_gauss_legendre_grid
      generic :: SH_itrans => SH_itrans_gauss_legendre_grid,        &
@@ -82,24 +78,29 @@ module module_spherical_harmonics
                            real_saxpy_gauss_legendre_field
   end type gauss_legendre_field
 
-  type, extends(gauss_legendre_field) :: real_gauss_legendre_field
-   contains
-  end type real_gauss_legendre_field
-
-
   type, extends(gauss_legendre_field) :: scalar_gauss_legendre_field
    contains
      procedure :: allocate => allocate_scalar_gauss_legendre_field
+     procedure :: set => set_value_scalar_gauss_legendre_field
+     procedure :: get => get_value_scalar_gauss_legendre_field
   end type scalar_gauss_legendre_field
 
-  type, extends(real_gauss_legendre_field) :: real_scalar_gauss_legendre_field
-     contains
-     procedure :: allocate => allocate_real_scalar_gauss_legendre_field
-  end type real_scalar_gauss_legendre_field
-    
-  
-  
 
+  type, extends(gauss_legendre_field) :: vector_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_vector_gauss_legendre_field
+     procedure :: set => set_value_vector_gauss_legendre_field
+     procedure :: get => get_value_vector_gauss_legendre_field
+  end type vector_gauss_legendre_field
+
+  type, extends(gauss_legendre_field) :: real_vector_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_real_vector_gauss_legendre_field
+     procedure :: set => set_value_real_vector_gauss_legendre_field
+     procedure :: get => get_value_real_vector_gauss_legendre_field
+  end type real_vector_gauss_legendre_field
+
+  
   !===============================================================!
   !                 type declarations SH expansions               !
   !===============================================================!
@@ -143,20 +144,32 @@ module module_spherical_harmonics
                            real_saxpy_spherical_harmonic_expansion
   end type spherical_harmonic_expansion
 
-  type, abstract, extends(spherical_harmonic_expansion) :: real_spherical_harmonic_expansion
-     contains
-       procedure :: index     => index_real_spherical_harmonic_expansion
-  end type real_spherical_harmonic_expansion
-
   type, extends(spherical_harmonic_expansion) :: scalar_spherical_harmonic_expansion
    contains
      procedure :: allocate => allocate_scalar_spherical_harmonic_expansion
+     procedure :: set => set_value_scalar_spherical_harmonic_expansion
+     procedure :: get => get_value_scalar_spherical_harmonic_expansion
+     procedure :: zero_final => zero_final_scalar_spherical_harmonic_expansion
   end type scalar_spherical_harmonic_expansion
 
-  type, extends(real_spherical_harmonic_expansion) :: real_scalar_spherical_harmonic_expansion
+  
+  type, extends(spherical_harmonic_expansion) :: vector_spherical_harmonic_expansion
    contains
-     procedure :: allocate => allocate_real_scalar_spherical_harmonic_expansion
-  end type real_scalar_spherical_harmonic_expansion
+     procedure :: allocate => allocate_vector_spherical_harmonic_expansion
+     procedure :: set => set_value_vector_spherical_harmonic_expansion
+     procedure :: get => get_value_vector_spherical_harmonic_expansion
+     procedure :: zero_final => zero_final_vector_spherical_harmonic_expansion
+  end type vector_spherical_harmonic_expansion
+
+
+  
+  type, extends(spherical_harmonic_expansion) :: real_vector_spherical_harmonic_expansion
+   contains
+     procedure :: allocate => allocate_real_vector_spherical_harmonic_expansion
+     procedure :: set => set_value_real_vector_spherical_harmonic_expansion
+     procedure :: get => get_value_real_vector_spherical_harmonic_expansion
+     procedure :: zero_final => zero_final_real_vector_spherical_harmonic_expansion
+  end type real_vector_spherical_harmonic_expansion
   
      
 contains
@@ -171,10 +184,13 @@ contains
   !--------------------------------------!
   
   subroutine delete_gauss_legendre_grid(grid)
+    use module_fftw3
     implicit none
     class(gauss_legendre_grid), intent(inout) :: grid
     if(.not.grid%allocated) return
-    deallocate(grid%th,grid%w)
+    deallocate(grid%th,grid%w,grid%dlm)
+    call fftw_destroy_plan(grid%plan_forward)
+    call fftw_destroy_plan(grid%plan_backward)
     grid%allocated = .false.
     return
   end subroutine delete_gauss_legendre_grid
@@ -230,9 +246,9 @@ contains
 
 
     ! make the wigner d-functions
-    allocate(grid%d(nth))
+    allocate(grid%dlm((lmax+1)*(lmax+2)/2,-nmax:nmax,nth))
     do ith = 1,nth
-       call grid%d(ith)%set(grid%th(ith),lmax,nmax,norm=.true.)
+       call set_wigner_array(grid%th(ith),lmax,nmax,grid%dlm(:,:,ith),norm=.true.)
     end do
     
     ! make the FFTW3 plans
@@ -306,46 +322,135 @@ contains
     pout = fftw_alloc_complex(int(nph, C_SIZE_T))
     call c_f_pointer(pin,   in, [nph])
     call c_f_pointer(pout, out, [nph])
-    
+
+    ! do the transformation
     na = abs(n)
-    even = modulo(n,2) == 0       
-    i2 = 0
-    do ith = 1,nth
-       i1 = i2+1
-       i2 = i1+nph-1
-       in = u(i1:i2)
-       call fftw_execute_dft(grid%plan_forward,in,out)
-       if(even) then
+    even = modulo(n,2) == 0
+
+    if(even) then
+
+       i2 = 0
+       do ith = 1,nth
+          i1 = i2+1
+          i2 = i1+nph-1
+          in = u(i1:i2)
+          call fftw_execute_dft(grid%plan_forward,in,out)
+          ilm = na*na
+          klm = na*(na+1)/2
+          w = grid%w(ith)*twopi/grid%nph
+          do l = na,lmax-1
+             sign = 1.0_dp
+             klm = klm+1
+             tmp1 =  grid%dlm(klm,n,ith)*w
+             tmp1 = tmp1*out(1)
+             ilm = ilm+1
+             ulm(ilm) = ulm(ilm) + tmp1
+             do m = 1,l
+                klm = klm+1             
+                tmp1 = grid%dlm(klm,n,ith)*w
+                tmp1 = tmp1*out(m+1)
+                ilm = ilm+1
+                ulm(ilm) = ulm(ilm)+tmp1             
+                sign = -sign
+                tmp1 = sign*grid%dlm(klm,-n,ith)*w
+                tmp1 = tmp1*out(nph-m+1)
+                ilm = ilm+1
+                ulm(ilm) = ulm(ilm)+tmp1
+             end do
+          end do
+          l = lmax
           sign = 1.0_dp
-       else
-          sign = -1.0_dp
-       end if
-       ilm = na*na
-       klm = na*(na+1)/2
-       w = grid%w(ith)*twopi/grid%nph
-       do l = na,lmax
           klm = klm+1
-          tmp1 =  grid%d(ith)%data(klm,n)*w
+          tmp1 =  grid%dlm(klm,n,ith)*w
           tmp1 = tmp1*out(1)
           ilm = ilm+1
           ulm(ilm) = ulm(ilm) + tmp1
-          do m = 1,l
+          do m = 1,l-1
              klm = klm+1             
-             tmp1 = grid%d(ith)%data(klm,n)*w
+             tmp1 = grid%dlm(klm,n,ith)*w
              tmp1 = tmp1*out(m+1)
              ilm = ilm+1
-             ulm(ilm) = ulm(ilm)+tmp1
-             if(m == lmax) cycle
-             tmp1 = sign*grid%d(ith)%data(klm,-n)*w
+             ulm(ilm) = ulm(ilm)+tmp1             
+             sign = -sign
+             tmp1 = sign*grid%dlm(klm,-n,ith)*w
              tmp1 = tmp1*out(nph-m+1)
              ilm = ilm+1
-             ulm(ilm) = ulm(ilm)+tmp1
-             sign = -sign
+             ulm(ilm) = ulm(ilm)+tmp1             
           end do
+          m = l
+          klm = klm+1             
+          tmp1 = grid%dlm(klm,n,ith)*w
+          tmp1 = tmp1*out(m+1)
+          ilm = ilm+1
+          ulm(ilm) = ulm(ilm)+tmp1
+          sign = -sign
        end do
-    end do
+
+       
+    else
+
+       i2 = 0
+       do ith = 1,nth
+          i1 = i2+1
+          i2 = i1+nph-1
+          in = u(i1:i2)
+          call fftw_execute_dft(grid%plan_forward,in,out)
+          ilm = na*na
+          klm = na*(na+1)/2
+          w = grid%w(ith)*twopi/grid%nph
+          do l = na,lmax-1
+             sign = -1.0_dp
+             klm = klm+1
+             tmp1 =  grid%dlm(klm,n,ith)*w
+             tmp1 = tmp1*out(1)
+             ilm = ilm+1
+             ulm(ilm) = ulm(ilm) + tmp1
+             do m = 1,l
+                klm = klm+1             
+                tmp1 = grid%dlm(klm,n,ith)*w
+                tmp1 = tmp1*out(m+1)
+                ilm = ilm+1
+                ulm(ilm) = ulm(ilm)+tmp1             
+                sign = -sign
+                tmp1 = sign*grid%dlm(klm,-n,ith)*w
+                tmp1 = tmp1*out(nph-m+1)
+                ilm = ilm+1
+                ulm(ilm) = ulm(ilm)+tmp1
+             end do
+          end do
+          l = lmax
+          sign = -1.0_dp
+          klm = klm+1
+          tmp1 =  grid%dlm(klm,n,ith)*w
+          tmp1 = tmp1*out(1)
+          ilm = ilm+1
+          ulm(ilm) = ulm(ilm) + tmp1
+          do m = 1,l-1
+             klm = klm+1             
+             tmp1 = grid%dlm(klm,n,ith)*w
+             tmp1 = tmp1*out(m+1)
+             ilm = ilm+1
+             ulm(ilm) = ulm(ilm)+tmp1             
+             sign = -sign
+             tmp1 = sign*grid%dlm(klm,-n,ith)*w
+             tmp1 = tmp1*out(nph-m+1)
+             ilm = ilm+1
+             ulm(ilm) = ulm(ilm)+tmp1             
+          end do
+          m = l
+          klm = klm+1             
+          tmp1 = grid%dlm(klm,n,ith)*w
+          tmp1 = tmp1*out(m+1)
+          ilm = ilm+1
+          ulm(ilm) = ulm(ilm)+tmp1
+          sign = -sign
+       end do
+       
+    end if
 
     
+
+    ! nullify the pointers
     call fftw_free(pin)
     call fftw_free(pout)
     in  => null()
@@ -353,100 +458,6 @@ contains
     
     return
   end subroutine SH_trans_gauss_legendre_grid
-
-  subroutine wrapper_SH_trans_gauss_legendre_grid(grid,u,ulm)
-    implicit none
-    class(gauss_legendre_grid), intent(in) :: grid
-    class(gauss_legendre_field), intent(in) :: u
-    class(spherical_harmonic_expansion), intent(inout) :: ulm
-    integer(i4b) :: icomp,i1,i2,j1,j2
-    do icomp = 1,u%ncomp
-       i1 = u%index(1,1,icomp)
-       i2 = u%index(u%nph,u%nth,icomp)
-       j1 = ulm%index(0,0,icomp)
-       j2 = ulm%index(-grid%lmax,grid%lmax,icomp)
-       call SH_trans_gauss_legendre_grid(grid,u%nval(icomp),u%data(i1:i2),ulm%data(j1:j2))       
-    end do
-    return
-  end subroutine wrapper_SH_trans_gauss_legendre_grid
-
-  
-  subroutine real_SH_trans_gauss_legendre_grid(grid,n,u,ulm)
-    use module_fftw3
-    implicit none
-    class(gauss_legendre_grid), intent(in) :: grid
-    integer(i4b), intent(in) :: n
-    complex(dpc), dimension(grid%nph*grid%nth), intent(in) :: u
-    complex(dpc), dimension(((grid%lmax+1)*(grid%lmax+2))/2), intent(out) :: ulm
-
-    logical :: even
-    integer(i4b) :: l,m,nth,nph,ith,ilm,i1,i2,klm,na,lmax
-    real(dp) :: fac,w,sign
-    complex(dpc) :: tmp1
-    complex(C_DOUBLE_COMPLEX), pointer :: in(:),out(:)
-    type(C_PTR) :: pin,pout
-
-    ! initialise the coefficients
-    ulm = 0.0_dp
-       
-    ! get some parameters
-    lmax = grid%lmax
-    nth = grid%nth
-    nph = grid%nph
-
-    ! set up the C pointers
-    pin  = fftw_alloc_complex(int(nph, C_SIZE_T))
-    pout = fftw_alloc_complex(int(nph, C_SIZE_T))
-    call c_f_pointer(pin,   in, [nph])
-    call c_f_pointer(pout, out, [nph])
-
-    na = abs(n)
-    i2 = 0
-    do ith = 1,nth
-       i1 = i2+1
-       i2 = i1+nph-1
-       in = u(i1:i2)
-       call fftw_execute_dft(grid%plan_forward,in,out)
-       ilm = (na*(na+1))/2
-       klm = (na*(na+1))/2
-       w = grid%w(ith)*twopi/grid%nph
-       do l = na,lmax
-          do m = 0,l
-             klm = klm+1
-             tmp1 = grid%d(ith)%data(klm,n)*w
-             tmp1 = tmp1*out(m+1)
-             ilm = ilm+1
-             ulm(ilm) = ulm(ilm)+tmp1
-          end do
-       end do
-    end do
-
-
-    call fftw_free(pin)
-    call fftw_free(pout)
-    in  => null()
-    out => null()
-    
-    return
-  end subroutine real_SH_trans_gauss_legendre_grid
-
-
-  subroutine wrapper_real_SH_trans_gauss_legendre_grid(grid,u,ulm)
-    implicit none
-    class(gauss_legendre_grid), intent(in) :: grid
-    class(real_gauss_legendre_field), intent(in) :: u
-    class(real_spherical_harmonic_expansion), intent(inout) :: ulm
-    integer(i4b) :: icomp,i1,i2,j1,j2
-    do icomp = 1,u%ncomp
-       i1 = u%index(1,1,icomp)
-       i2 = u%index(u%nph,u%nth,icomp)
-       j1 = ulm%index(0,0,icomp)
-       j2 = ulm%index(grid%lmax,grid%lmax,icomp)
-       call real_SH_trans_gauss_legendre_grid(grid,u%nval(icomp),u%data(i1:i2),ulm%data(j1:j2))       
-    end do
-    return
-  end subroutine wrapper_real_SH_trans_gauss_legendre_grid
-
 
 
   subroutine SH_itrans_gauss_legendre_grid(grid,n,ulm,u)
@@ -464,59 +475,147 @@ contains
     complex(dpc), dimension(grid%nph) :: lout
     complex(C_DOUBLE_COMPLEX), pointer :: in(:),out(:)
     type(C_PTR) :: pin,pout
-
+    
     ! initialise the function
     u = 0.0_dp
-       
+    
     ! get some parameters
     lmax = grid%lmax
     nth = grid%nth
     nph = grid%nph
-
+    
     ! set up the C pointers
     pin  = fftw_alloc_complex(int(nph, C_SIZE_T))
     pout = fftw_alloc_complex(int(nph, C_SIZE_T))
     call c_f_pointer(pin,   in, [nph])
     call c_f_pointer(pout, out, [nph])
 
+    ! do the transformation
     na = abs(n)
     even = modulo(n,2) == 0
-    i2 = 0
-    do ith = 1,nth
-       in = 0.0_dp
-       ilm = na*na
-       klm = na*(na+1)/2
-       if(even) then
+
+
+    if(even) then
+
+       i2 = 0
+       do ith = 1,nth
+          in = 0.0_dp
+          ilm = na*na
+          klm = na*(na+1)/2
+          do l = na,lmax-1
+             sign = 1.0_dp
+             klm = klm+1
+             tmp1 = grid%dlm(klm,n,ith)
+             ilm = ilm+1
+             tmp1 = tmp1*ulm(ilm)
+             in(1) = in(1) + tmp1
+             do m = 1,l
+                klm = klm+1
+                tmp1 = grid%dlm(klm,n,ith)
+                ilm = ilm+1
+                tmp1 = tmp1*ulm(ilm)
+                in(m+1) = in(m+1) + tmp1
+                sign = -sign
+                tmp1 = sign*grid%dlm(klm,-n,ith)
+                ilm = ilm+1             
+                tmp1 = tmp1*ulm(ilm)
+                in(nph-m+1) = in(nph-m+1) + tmp1
+             end do
+          end do
+          l = lmax
           sign = 1.0_dp
-       else
-          sign = -1.0_dp
-       end if
-       do l = na,lmax
           klm = klm+1
-          tmp1 = grid%d(ith)%data(klm,n)
+          tmp1 = grid%dlm(klm,n,ith)
           ilm = ilm+1
           tmp1 = tmp1*ulm(ilm)
           in(1) = in(1) + tmp1
-          do m = 1,l
+          do m = 1,l-1
              klm = klm+1
-             tmp1 = grid%d(ith)%data(klm,n)
+             tmp1 = grid%dlm(klm,n,ith)
              ilm = ilm+1
              tmp1 = tmp1*ulm(ilm)
              in(m+1) = in(m+1) + tmp1
-             if(m == lmax) cycle
-             tmp1 = sign*grid%d(ith)%data(klm,-n)
+             sign = -sign
+             tmp1 = sign*grid%dlm(klm,-n,ith)
              ilm = ilm+1             
              tmp1 = tmp1*ulm(ilm)
              in(nph-m+1) = in(nph-m+1) + tmp1
-             sign = -sign
           end do
-       end do       
-       call fftw_execute_dft(grid%plan_backward,in,out)
-       i1 = i2+1
-       i2 = i1+nph-1
-       u(i1:i2) = out
-    end do
+          m = l
+          klm = klm+1
+          tmp1 = grid%dlm(klm,n,ith)
+          ilm = ilm+1
+          tmp1 = tmp1*ulm(ilm)
+          in(m+1) = in(m+1) + tmp1       
+          call fftw_execute_dft(grid%plan_backward,in,out)
+          i1 = i2+1
+          i2 = i1+nph-1
+          u(i1:i2) = out          
+       end do
 
+    else
+
+       i2 = 0
+       do ith = 1,nth
+          in = 0.0_dp
+          ilm = na*na
+          klm = na*(na+1)/2
+          do l = na,lmax-1
+             sign = -1.0_dp
+             klm = klm+1
+             tmp1 = grid%dlm(klm,n,ith)
+             ilm = ilm+1
+             tmp1 = tmp1*ulm(ilm)
+             in(1) = in(1) + tmp1
+             do m = 1,l
+                klm = klm+1
+                tmp1 = grid%dlm(klm,n,ith)
+                ilm = ilm+1
+                tmp1 = tmp1*ulm(ilm)
+                in(m+1) = in(m+1) + tmp1
+                sign = -sign
+                tmp1 = sign*grid%dlm(klm,-n,ith)
+                ilm = ilm+1             
+                tmp1 = tmp1*ulm(ilm)
+                in(nph-m+1) = in(nph-m+1) + tmp1
+             end do
+          end do
+          l = lmax
+          sign = -1.0_dp
+          klm = klm+1
+          tmp1 = grid%dlm(klm,n,ith)
+          ilm = ilm+1
+          tmp1 = tmp1*ulm(ilm)
+          in(1) = in(1) + tmp1
+          do m = 1,l-1
+             klm = klm+1
+             tmp1 = grid%dlm(klm,n,ith)
+             ilm = ilm+1
+             tmp1 = tmp1*ulm(ilm)
+             in(m+1) = in(m+1) + tmp1
+             sign = -sign
+             tmp1 = sign*grid%dlm(klm,-n,ith)
+             ilm = ilm+1             
+             tmp1 = tmp1*ulm(ilm)
+             in(nph-m+1) = in(nph-m+1) + tmp1
+          end do
+          m = l
+          klm = klm+1
+          tmp1 = grid%dlm(klm,n,ith)
+          ilm = ilm+1
+          tmp1 = tmp1*ulm(ilm)
+          in(m+1) = in(m+1) + tmp1       
+          call fftw_execute_dft(grid%plan_backward,in,out)
+          i1 = i2+1
+          i2 = i1+nph-1
+          u(i1:i2) = out
+       end do
+       
+
+    end if
+    
+
+    ! nullify pointers
     call fftw_free(pin)
     call fftw_free(pout)
     in  => null()
@@ -524,6 +623,23 @@ contains
     
     return
   end subroutine SH_itrans_gauss_legendre_grid
+
+
+  subroutine wrapper_SH_trans_gauss_legendre_grid(grid,u,ulm)
+    implicit none
+    class(gauss_legendre_grid), intent(in) :: grid
+    class(gauss_legendre_field), intent(in) :: u
+    class(spherical_harmonic_expansion), intent(inout) :: ulm
+    integer(i4b) :: icomp,i1,i2,j1,j2
+    do icomp = 1,u%ncomp
+       i1 = u%index(1,1,icomp)
+       i2 = u%index(u%nph,u%nth,icomp)
+       j1 = ulm%index(0,0,icomp)
+       j2 = ulm%index(-grid%lmax,grid%lmax,icomp)
+       call SH_trans_gauss_legendre_grid(grid,u%nval(icomp),u%data(i1:i2),ulm%data(j1:j2))       
+    end do
+    return
+  end subroutine wrapper_SH_trans_gauss_legendre_grid
 
   
   subroutine wrapper_SH_itrans_gauss_legendre_grid(grid,ulm,u)
@@ -787,7 +903,8 @@ contains
   !            procedures for derived types              !
   !------------------------------------------------------!
 
-
+  ! scalar fields
+  
   subroutine allocate_scalar_gauss_legendre_field(self,grid)
     implicit none
     class(scalar_gauss_legendre_field), intent(inout) :: self
@@ -796,14 +913,101 @@ contains
     return
   end subroutine allocate_scalar_gauss_legendre_field
 
-
-  subroutine allocate_real_scalar_gauss_legendre_field(self,grid)
+  subroutine set_value_scalar_gauss_legendre_field(self,iph,ith,val)
     implicit none
-    class(real_scalar_gauss_legendre_field), intent(inout) :: self
-    type(gauss_legendre_grid), intent(in) :: grid
-    call allocate_gauss_legendre_field(self,grid%lmax,1,(/0/))    
+    class(scalar_gauss_legendre_field), intent(inout) :: self
+    integer(i4b), intent(in) :: ith,iph
+    complex(dpc), intent(in) :: val
+    self%data(self%index(iph,ith,1)) = val    
     return
-  end subroutine allocate_real_scalar_gauss_legendre_field
+  end subroutine set_value_scalar_gauss_legendre_field
+
+  function get_value_scalar_gauss_legendre_field(self,iph,ith) result(val)
+    implicit none
+    class(scalar_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: ith,iph
+    complex(dpc) :: val
+    val = self%data(self%index(iph,ith,1)) 
+    return
+  end function get_value_scalar_gauss_legendre_field
+
+  ! vector fields
+  
+  subroutine allocate_vector_gauss_legendre_field(self,grid)
+    implicit none
+    class(vector_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_gauss_legendre_field(self,grid%lmax,3,(/-1,0,1/))    
+    return
+  end subroutine allocate_vector_gauss_legendre_field
+
+  subroutine set_value_vector_gauss_legendre_field(self,iph,ith,alpha,val)
+    implicit none
+    class(vector_gauss_legendre_field), intent(inout) :: self
+    integer(i4b), intent(in) :: ith,iph,alpha
+    complex(dpc), intent(in) :: val
+    integer(i4b) :: icomp
+    icomp = alpha+2
+    self%data(self%index(iph,ith,icomp)) = val    
+    return
+  end subroutine set_value_vector_gauss_legendre_field
+
+  function get_value_vector_gauss_legendre_field(self,iph,ith,alpha) result(val)
+    implicit none
+    class(vector_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: ith,iph,alpha
+    complex(dpc) :: val
+    integer(i4b) :: icomp
+    icomp = alpha+2
+    val = self%data(self%index(iph,ith,icomp)) 
+    return
+  end function get_value_vector_gauss_legendre_field
+
+
+  ! real vector fields
+  
+  subroutine allocate_real_vector_gauss_legendre_field(self,grid)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_gauss_legendre_field(self,grid%lmax,2,(/-1,0/))    
+    return
+  end subroutine allocate_real_vector_gauss_legendre_field
+
+  subroutine set_value_real_vector_gauss_legendre_field(self,iph,ith,alpha,val)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(inout) :: self
+    integer(i4b), intent(in) :: ith,iph,alpha
+    complex(dpc), intent(in) :: val
+    select case(alpha)
+    case(-1)
+       self%data(self%index(iph,ith,1)) = val    
+    case(0)
+       self%data(self%index(iph,ith,2)) = val    
+    case(1)
+       self%data(self%index(iph,ith,1)) = -conjg(val)
+    end select
+
+    return
+  end subroutine set_value_real_vector_gauss_legendre_field
+
+  function get_value_real_vector_gauss_legendre_field(self,iph,ith,alpha) result(val)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: ith,iph,alpha
+    complex(dpc) :: val
+    select case(alpha)
+    case(-1)
+       val = self%data(self%index(iph,ith,1)) 
+    case(0)
+       val = self%data(self%index(iph,ith,2))
+    case(1)
+       val = -conjg(self%data(self%index(iph,ith,1)))
+    end select
+    return
+  end function get_value_real_vector_gauss_legendre_field
+
+  
   
   !=======================================================================!
   !          procedures for the spherical_harmonic_expansion type         !
@@ -844,8 +1048,6 @@ contains
     return
   end subroutine allocate_spherical_harmonic_expansion
 
-
-
   function index_spherical_harmonic_expansion(self,m,l,icomp) result(i)
     implicit none
     class(spherical_harmonic_expansion), intent(in) :: self
@@ -862,33 +1064,6 @@ contains
     return
   end function index_spherical_harmonic_expansion
   
-  subroutine allocate_real_spherical_harmonic_expansion(self,lmax,ncomp,nval)
-    implicit none
-    class(real_spherical_harmonic_expansion), intent(inout) :: self
-    integer(i4b), intent(in) :: lmax
-    integer(i4b), intent(in) :: ncomp
-    integer(i4b), dimension(ncomp), intent(in) :: nval
-    call self%delete()
-    self%lmax= lmax
-    self%ncomp = ncomp
-    self%ncoef = ((lmax+1)*(lmax+2))/2
-    self%ndim = ncomp*self%ncoef
-    allocate(self%nval(ncomp))
-    allocate(self%data(self%ndim))
-    self%allocated = .true.
-    return
-  end subroutine allocate_real_spherical_harmonic_expansion
-
-
-  function index_real_spherical_harmonic_expansion(self,m,l,icomp) result(i)
-    implicit none
-    class(real_spherical_harmonic_expansion), intent(in) :: self
-    integer(i4b), intent(in) :: m,l,icomp
-    integer(i4b) :: i
-    i = self%ncoef*(icomp-1) + (l*(l+1))/2 + m + 1 
-    return
-  end function index_real_spherical_harmonic_expansion
-
   
   subroutine set_sobolev_spherical_harmonic_expansion(u,s,mu)
     implicit none
@@ -1097,6 +1272,8 @@ contains
   !            procedures for derived types              !
   !------------------------------------------------------!
 
+
+  ! scalar fields
   
   subroutine allocate_scalar_spherical_harmonic_expansion(self,grid)
     implicit none
@@ -1106,15 +1283,138 @@ contains
     return
   end subroutine allocate_scalar_spherical_harmonic_expansion
 
-  subroutine allocate_real_scalar_spherical_harmonic_expansion(self,grid)
+  subroutine set_value_scalar_spherical_harmonic_expansion(self,l,m,val)
     implicit none
-    class(real_scalar_spherical_harmonic_expansion), intent(inout) :: self
-    type(gauss_legendre_grid), intent(in) :: grid
-    call allocate_real_spherical_harmonic_expansion(self,grid%lmax,1,(/0/))
+    class(scalar_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: l,m
+    complex(dpc), intent(in) :: val
+    self%data(self%index(m,l,1)) = val    
     return
-  end subroutine allocate_real_scalar_spherical_harmonic_expansion
+  end subroutine set_value_scalar_spherical_harmonic_expansion
+
+  function get_value_scalar_spherical_harmonic_expansion(self,l,m) result(val)
+    implicit none
+    class(scalar_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: l,m
+    complex(dpc) :: val
+    val = self%data(self%index(m,l,1)) 
+    return
+  end function get_value_scalar_spherical_harmonic_expansion
+
+  subroutine zero_final_scalar_spherical_harmonic_expansion(self)
+    implicit none
+    class(scalar_spherical_harmonic_expansion), intent(inout) :: self
+    call self%set(self%lmax,-self%lmax,self%get(self%lmax,self%lmax))
+    return
+  end subroutine zero_final_scalar_spherical_harmonic_expansion
+
+  ! vector fields
+  
+  subroutine allocate_vector_spherical_harmonic_expansion(self,grid)
+    implicit none
+    class(vector_spherical_harmonic_expansion), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,3,(/-1,0,1/))
+    return
+  end subroutine allocate_vector_spherical_harmonic_expansion
+
+  subroutine set_value_vector_spherical_harmonic_expansion(self,l,m,alpha,val)
+    implicit none
+    class(vector_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: l,m,alpha
+    complex(dpc), intent(in) :: val
+    integer(i4b) :: icomp
+    icomp = alpha+2
+    self%data(self%index(m,l,icomp)) = val    
+    return
+  end subroutine set_value_vector_spherical_harmonic_expansion
+
+  function get_value_vector_spherical_harmonic_expansion(self,l,m,alpha) result(val)
+    implicit none
+    class(vector_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: l,m,alpha
+    complex(dpc) :: val
+    integer(i4b) :: icomp
+    icomp = alpha+2
+    val = self%data(self%index(m,l,icomp)) 
+    return
+  end function get_value_vector_spherical_harmonic_expansion
+
+  subroutine zero_final_vector_spherical_harmonic_expansion(self)
+    implicit none
+    class(vector_spherical_harmonic_expansion), intent(inout) :: self
+    self%data(self%index(-self%lmax,self%lmax,1)) = 0.0_dp
+    self%data(self%index(-self%lmax,self%lmax,2)) = 0.0_dp
+    self%data(self%index(-self%lmax,self%lmax,3)) = 0.0_dp
+    return
+  end subroutine zero_final_vector_spherical_harmonic_expansion
 
 
+
+  ! real vector fields
+  
+  subroutine allocate_real_vector_spherical_harmonic_expansion(self,grid)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,2,(/-1,0/))
+    return
+  end subroutine allocate_real_vector_spherical_harmonic_expansion
+
+  subroutine set_value_real_vector_spherical_harmonic_expansion(self,l,m,alpha,val)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: l,m,alpha
+    complex(dpc), intent(in) :: val
+    integer(i4b) :: sign
+    select case(alpha)
+    case(-1)
+       self%data(self%index(m,l,1)) = val    
+    case(0)
+       self%data(self%index(m,l,2)) = val
+    case(1)
+       if(modulo(m,2) == 0) then
+          sign = 1
+       else
+          sign = -1
+       end if
+       self%data(self%index(-m,l,1)) = sign*conjg(val)
+    end select
+    return
+  end subroutine set_value_real_vector_spherical_harmonic_expansion
+
+  function get_value_real_vector_spherical_harmonic_expansion(self,l,m,alpha) result(val)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: l,m,alpha
+    complex(dpc) :: val
+    integer(i4b) :: sign
+    select case(alpha)
+    case(-1)
+       val = self%data(self%index(m,l,1))
+    case(0)
+       val = self%data(self%index(m,l,2))
+    case(1)
+       if(modulo(m,2) == 0) then
+          sign = 1
+       else
+          sign = -1
+       end if
+       val = sign*conjg(self%data(self%index(-m,l,1)))
+    end select
+    
+    return
+  end function get_value_real_vector_spherical_harmonic_expansion
+
+  subroutine zero_final_real_vector_spherical_harmonic_expansion(self)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(inout) :: self
+    self%data(self%index(-self%lmax,self%lmax,1)) = 0.0_dp
+    self%data(self%index(-self%lmax,self%lmax,2)) = 0.0_dp
+    return
+  end subroutine zero_final_real_vector_spherical_harmonic_expansion
+
+  
 end module module_spherical_harmonics
 
 

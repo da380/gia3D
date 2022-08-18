@@ -52,15 +52,14 @@ def plot_2D_data(filename):
             fun[ix][iy]= mfile[k,2]        
 
 
-
-#    mm = np.max(abs(fun))
+    mm = np.max(abs(fun))
 #    mm = np.max(-(fun))
 
 
     plt.figure()
     plt.pcolormesh(x,y,fun,shading='gouraud',cmap = 'RdBu')
     plt.colorbar()
-#    plt.clim(-mm,mm)
+    plt.clim(-mm,mm)
     plt.axis('equal')
 
 
