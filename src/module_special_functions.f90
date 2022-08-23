@@ -694,8 +694,6 @@ contains
     return
   end function get_slice_wigner_value
 
-
-
   
   subroutine set_wigner_array(beta,lmax,nmax,dlm,norm)
     implicit none
@@ -720,7 +718,6 @@ contains
           end do
        end do
     end do
-
     call p%delete()    
     return
   end subroutine set_wigner_array

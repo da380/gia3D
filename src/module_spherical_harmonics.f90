@@ -4,7 +4,6 @@ module module_spherical_harmonics
   use module_special_functions
   use, intrinsic :: iso_c_binding
 
-
   !===============================================================!
   !               type declaration for the GL-grid                !
   !===============================================================!
@@ -49,12 +48,11 @@ module module_spherical_harmonics
      integer(i4b) :: nph
      integer(i4b) :: nc = 0
      integer(i4b) :: cdim
-     integer(i4b), dimension(:), allocatable :: cnval
+     integer(i4b), dimension(:), allocatable :: nval
      complex(dpc), dimension(:), allocatable :: cdata
      integer(i4b) :: nr = 0
      integer(i4b) :: rdim
-     real(dp), dimension(:), allocatable :: rdata
-     
+     real(dp), dimension(:), allocatable :: rdata     
    contains
      procedure :: delete => delete_gauss_legendre_field
      procedure :: index =>    index_gauss_legendre_field
@@ -65,41 +63,51 @@ module module_spherical_harmonics
      procedure :: saxpy_gauss_legendre_field
      procedure :: real_saxpy_gauss_legendre_field          
      generic   :: saxpy => saxpy_gauss_legendre_field,     &
-                           real_saxpy_gauss_legendre_field
+          real_saxpy_gauss_legendre_field
   end type gauss_legendre_field
 
   type, extends(gauss_legendre_field) :: scalar_gauss_legendre_field
-     logical :: real = .false.
    contains
      procedure :: allocate => allocate_scalar_gauss_legendre_field
-     procedure :: set_complex_scalar_gauss_legendre_field
-     procedure :: set_real_scalar_gauss_legendre_field
-     generic   :: set => set_complex_scalar_gauss_legendre_field, &
-                         set_real_scalar_gauss_legendre_field
-     procedure :: getc => get_complex_scalar_gauss_legendre_field
-     procedure :: getr => get_real_scalar_gauss_legendre_field
+     procedure :: set => set_scalar_gauss_legendre_field
+     procedure :: get => get_scalar_gauss_legendre_field
+     procedure :: harmonic => harmonic_scalar_gauss_legendre_field
   end type scalar_gauss_legendre_field
+  
+  type, extends(gauss_legendre_field) :: real_scalar_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_real_scalar_gauss_legendre_field
+     procedure :: set => set_real_scalar_gauss_legendre_field
+     procedure :: get => get_real_scalar_gauss_legendre_field
+     procedure :: harmonic => harmonic_real_scalar_gauss_legendre_field
+  end type real_scalar_gauss_legendre_field
 
 
   type, extends(gauss_legendre_field) :: vector_gauss_legendre_field
-     logical :: real = .false.
    contains
      procedure :: allocate => allocate_vector_gauss_legendre_field
-     procedure :: set => set_value_vector_gauss_legendre_field
-     procedure :: get => get_value_vector_gauss_legendre_field
+     procedure :: set => set_vector_gauss_legendre_field
+     procedure :: get => get_vector_gauss_legendre_field
+     procedure :: harmonic => harmonic_vector_gauss_legendre_field
   end type vector_gauss_legendre_field
 
   
-  type, extends(gauss_legendre_field) :: second_tensor_gauss_legendre_field
-     logical :: symmetric  = .false.
-     logical :: trace_free = .false.
-     logical :: real       = .false.
+  type, extends(gauss_legendre_field) :: real_vector_gauss_legendre_field
    contains
-     procedure :: allocate => allocate_second_tensor_gauss_legendre_field
-     procedure :: set => set_value_second_tensor_gauss_legendre_field
-     procedure :: get => get_value_second_tensor_gauss_legendre_field
-  end type second_tensor_gauss_legendre_field
+     procedure :: allocate => allocate_real_vector_gauss_legendre_field
+     procedure :: set => set_real_vector_gauss_legendre_field
+     procedure :: get => get_real_vector_gauss_legendre_field
+     procedure :: harmonic => harmonic_real_vector_gauss_legendre_field
+  end type real_vector_gauss_legendre_field
 
+  
+  type, extends(gauss_legendre_field) :: internal_variable_gauss_legendre_field
+   contains
+     procedure :: allocate => allocate_internal_variable_gauss_legendre_field
+     procedure :: set => set_internal_variable_gauss_legendre_field
+     procedure :: get => get_internal_variable_gauss_legendre_field
+     procedure :: harmonic => harmonic_internal_variable_gauss_legendre_field
+  end type internal_variable_gauss_legendre_field
 
   
   !===============================================================!
@@ -114,7 +122,7 @@ module module_spherical_harmonics
      integer(i4b) :: nc = 0
      integer(i4b) :: cncoef
      integer(i4b) :: cdim
-     integer(i4b), dimension(:), allocatable :: cnval     
+     integer(i4b), dimension(:), allocatable :: nval     
      complex(dpc), dimension(:), allocatable :: cdata
      integer(i4b) :: nr = 0
      integer(i4b) :: rncoef
@@ -133,35 +141,48 @@ module module_spherical_harmonics
      procedure :: real_saxpy_spherical_harmonic_expansion          
      generic   :: saxpy => saxpy_spherical_harmonic_expansion,     &
                            real_saxpy_spherical_harmonic_expansion
+     procedure :: random => random_values_spherical_harmonic_expansion
   end type spherical_harmonic_expansion
 
   type, extends(spherical_harmonic_expansion) :: scalar_spherical_harmonic_expansion
-     logical :: real = .false.
    contains
      procedure :: allocate => allocate_scalar_spherical_harmonic_expansion
-     procedure :: set => set_complex_scalar_spherical_harmonic_expansion
-     procedure :: get => get_complex_scalar_spherical_harmonic_expansion
+     procedure :: set => set_scalar_spherical_harmonic_expansion
+     procedure :: get => get_scalar_spherical_harmonic_expansion
   end type scalar_spherical_harmonic_expansion
 
   
-  type, extends(spherical_harmonic_expansion) :: vector_spherical_harmonic_expansion
-     logical :: real = .false.
+  type, extends(spherical_harmonic_expansion) :: real_scalar_spherical_harmonic_expansion
    contains
-     procedure :: allocate => allocate_vector_spherical_harmonic_expansion
-     procedure :: set => set_value_vector_spherical_harmonic_expansion
-     procedure :: get => get_value_vector_spherical_harmonic_expansion
-  end type vector_spherical_harmonic_expansion
+     procedure :: allocate => allocate_real_scalar_spherical_harmonic_expansion
+     procedure :: set => set_real_scalar_spherical_harmonic_expansion
+     procedure :: get => get_real_scalar_spherical_harmonic_expansion
+  end type real_scalar_spherical_harmonic_expansion
 
   
-  type, extends(spherical_harmonic_expansion) :: second_tensor_spherical_harmonic_expansion
-     logical :: symmetric  = .false.
-     logical :: trace_free = .false.
-     logical :: real       = .false.
+  type, extends(spherical_harmonic_expansion) :: vector_spherical_harmonic_expansion
    contains
-     procedure :: allocate => allocate_second_tensor_spherical_harmonic_expansion
-     procedure :: set => set_value_second_tensor_spherical_harmonic_expansion
-     procedure :: get => get_value_second_tensor_spherical_harmonic_expansion
-  end type second_tensor_spherical_harmonic_expansion
+     procedure :: allocate => allocate_vector_spherical_harmonic_expansion
+     procedure :: set => set_vector_spherical_harmonic_expansion
+     procedure :: get => get_vector_spherical_harmonic_expansion
+  end type vector_spherical_harmonic_expansion
+
+
+  type, extends(spherical_harmonic_expansion) :: real_vector_spherical_harmonic_expansion
+   contains
+     procedure :: allocate => allocate_real_vector_spherical_harmonic_expansion
+     procedure :: set => set_real_vector_spherical_harmonic_expansion
+     procedure :: get => get_real_vector_spherical_harmonic_expansion
+  end type real_vector_spherical_harmonic_expansion
+
+
+
+  type, extends(spherical_harmonic_expansion) :: internal_variable_spherical_harmonic_expansion
+   contains
+     procedure :: allocate => allocate_internal_variable_spherical_harmonic_expansion
+     procedure :: set => set_internal_variable_spherical_harmonic_expansion
+     procedure :: get => get_internal_variable_spherical_harmonic_expansion
+  end type internal_variable_spherical_harmonic_expansion
   
      
 contains
@@ -226,7 +247,6 @@ contains
     nph = 2*lmax
     grid%nth = nth
     grid%nph = nph
-
     
     ! make the quadrature points and weights
     allocate(grid%th(lmax+1))
@@ -235,7 +255,6 @@ contains
     call quad%set(lmax+1,poly)
     grid%th = acos(quad%points())
     grid%w = quad%weights()
-
 
     ! make the wigner d-functions
     allocate(grid%dlm((lmax+1)*(lmax+2)/2,-nmax:nmax,nth))
@@ -288,8 +307,6 @@ contains
     return
   end function ph_gauss_legednre_grid
   
-
-
 
 
   !-----------------------------------------------------------------!
@@ -772,7 +789,7 @@ contains
        i2 = u%index(u%nph,u%nth,icomp)
        j1 = ulm%cindex(0,0,icomp)
        j2 = ulm%cindex(-grid%lmax,grid%lmax,icomp)
-       call SH_trans_gauss_legendre_grid(grid,u%cnval(icomp),u%cdata(i1:i2),ulm%cdata(j1:j2))       
+       call SH_trans_gauss_legendre_grid(grid,u%nval(icomp),u%cdata(i1:i2),ulm%cdata(j1:j2))       
     end do
     return
   end subroutine wrapper_SH_trans_gauss_legendre_grid
@@ -796,7 +813,7 @@ contains
        i2 = u%index(u%nph,u%nth,icomp)
        j1 = ulm%cindex(0,0,icomp)
        j2 = ulm%cindex(-ulm%lmax,ulm%lmax,icomp)
-       call SH_itrans_gauss_legendre_grid(grid,u%cnval(icomp),ulm%cdata(j1:j2),u%cdata(i1:i2))
+       call SH_itrans_gauss_legendre_grid(grid,u%nval(icomp),ulm%cdata(j1:j2),u%cdata(i1:i2))
     end do
     return
   end subroutine wrapper_SH_itrans_gauss_legendre_grid
@@ -815,19 +832,19 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     if(.not.self%allocated) return
     deallocate(self%cdata)
-    deallocate(self%cnval)
+    deallocate(self%nval)
     deallocate(self%rdata)
     self%allocated = .false.
     return
   end subroutine delete_gauss_legendre_field
 
   
-  subroutine allocate_gauss_legendre_field(self,lmax,nc,cnval,nr)
+  subroutine allocate_gauss_legendre_field(self,lmax,nc,nval,nr)
     implicit none
     class(gauss_legendre_field), intent(inout) :: self
     integer(i4b), intent(in) :: lmax
     integer(i4b), intent(in) :: nc
-    integer(i4b), intent(in), dimension(nc) :: cnval
+    integer(i4b), intent(in), dimension(nc) :: nval
     integer(i4b), intent(in) :: nr
     call self%delete()    
     self%lmax = lmax
@@ -835,11 +852,11 @@ contains
     self%nth = lmax+1
     self%nph = 2*lmax
     self%cdim = self%nc*self%nth*self%nph
-    allocate(self%cnval(self%nc))
+    allocate(self%nval(self%nc))
     allocate(self%cdata(self%cdim))
     if(nc > 0) then
        self%cdata = 0.0_dp
-       self%cnval = cnval
+       self%nval = nval
     end if
     self%nr = nr
     self%rdim = self%nr*self%nth*self%nph
@@ -864,6 +881,7 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     complex(dpc), intent(in) :: a
     call zscal(self%cdim,a,self%cdata,1)
+    call dscal(self%rdim,real(a,kind=dp),self%rdata,1)
     return
   end subroutine scale_gauss_legendre_field
 
@@ -872,6 +890,7 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     real(dp), intent(in) :: a
     call zdscal(self%cdim,a,self%cdata,1)
+    call dscal(self%rdim,a,self%rdata,1)
     return
   end subroutine real_scale_gauss_legendre_field
 
@@ -881,6 +900,7 @@ contains
     complex(dpc), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: other
     call zaxpy(self%cdim,a,other%cdata,1,self%cdata,1)
+    call daxpy(self%rdim,real(a,kind=dp),other%rdata,1,self%rdata,1)
     return
   end subroutine saxpy_gauss_legendre_field
 
@@ -889,188 +909,315 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     real(dp), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: other
-    complex(dpc) :: aloc
-    aloc = a
-    call zaxpy(self%cdim,aloc,other%cdata,1,self%cdata,1)
+    complex(dpc) :: ac
+    ac = a
+    call zaxpy(self%cdim,ac,other%rdata,1,self%rdata,1)
+    call daxpy(self%rdim,a,other%rdata,1,self%rdata,1)
     return
   end subroutine real_saxpy_gauss_legendre_field
 
-
+  
   !------------------------------------------------------!
   !            procedures for derived types              !
   !------------------------------------------------------!
 
   ! scalar fields
   
-  subroutine allocate_scalar_gauss_legendre_field(self,grid,real)
+  subroutine allocate_scalar_gauss_legendre_field(self,grid)
     implicit none
     class(scalar_gauss_legendre_field), intent(inout) :: self
     type(gauss_legendre_grid), intent(in) :: grid
-    logical, intent(in), optional :: real
-    integer(i4b), dimension(0) :: null
-    if(present(real)) then
-       self%real = real
-    end if
-    if(self%real) then
-       call allocate_gauss_legendre_field(self,grid%lmax,0,null,1)
-    else
-       call allocate_gauss_legendre_field(self,grid%lmax,1,(/0/),0)
-    end if
+    call allocate_gauss_legendre_field(self,grid%lmax,1,(/0/),0)
     return
   end subroutine allocate_scalar_gauss_legendre_field
 
-  subroutine set_complex_scalar_gauss_legendre_field(self,iph,ith,val)
+  subroutine set_scalar_gauss_legendre_field(self,iph,ith,val)
     implicit none
     class(scalar_gauss_legendre_field), intent(inout) :: self
     integer(i4b), intent(in) :: ith,iph
     complex(dpc), intent(in) :: val
     self%cdata(self%index(iph,ith,1)) = val    
     return
-  end subroutine set_complex_scalar_gauss_legendre_field
+  end subroutine set_scalar_gauss_legendre_field
 
 
-  subroutine set_real_scalar_gauss_legendre_field(self,iph,ith,val)
-    implicit none
-    class(scalar_gauss_legendre_field), intent(inout) :: self
-    integer(i4b), intent(in) :: ith,iph
-    real(dp), intent(in) :: val
-    self%rdata(self%index(iph,ith,1)) = val    
-    return
-  end subroutine set_real_scalar_gauss_legendre_field
-
-  function get_complex_scalar_gauss_legendre_field(self,iph,ith) result(val)
+  function get_scalar_gauss_legendre_field(self,iph,ith) result(val)
     implicit none
     class(scalar_gauss_legendre_field), intent(in) :: self
     integer(i4b), intent(in) :: ith,iph
     complex(dpc) :: val
     val = self%cdata(self%index(iph,ith,1)) 
     return
-  end function get_complex_scalar_gauss_legendre_field
+  end function get_scalar_gauss_legendre_field
 
+  subroutine harmonic_scalar_gauss_legendre_field(self,grid,l,m)
+    implicit none
+    class(scalar_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b), intent(in) :: l,m
+    integer(i4b) :: ith,iph,klm
+    real(dp) :: ph
+    complex(dpc) :: cfun
+    klm = l*(l+1)/2 + abs(m) + 1
+    do ith = 1,grid%nth
+       do iph = 1,grid%nph
+          ph = grid%ph(iph)
+          if(m >= 0) then
+             cfun = grid%dlm(klm,0,ith)*exp(ii*m*ph)
+          else
+             cfun = (-1)**m*grid%dlm(klm,0,ith)*exp(ii*m*ph)
+          end if
+          call self%set(iph,ith,cfun)
+       end do
+    end do
+    return
+  end subroutine harmonic_scalar_gauss_legendre_field
+
+  
+  ! real scalar fields
+  
+  subroutine allocate_real_scalar_gauss_legendre_field(self,grid)
+    implicit none
+    class(real_scalar_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    integer, dimension(0) :: null
+    call allocate_gauss_legendre_field(self,grid%lmax,0,null,1)
+    return
+  end subroutine allocate_real_scalar_gauss_legendre_field
+
+  subroutine set_real_scalar_gauss_legendre_field(self,iph,ith,val)
+    implicit none
+    class(real_scalar_gauss_legendre_field), intent(inout) :: self
+    integer(i4b), intent(in) :: ith,iph
+    real(dp), intent(in) :: val
+    self%rdata(self%index(iph,ith,1)) = val    
+    return
+  end subroutine set_real_scalar_gauss_legendre_field
 
   function get_real_scalar_gauss_legendre_field(self,iph,ith) result(val)
     implicit none
-    class(scalar_gauss_legendre_field), intent(in) :: self
+    class(real_scalar_gauss_legendre_field), intent(in) :: self
     integer(i4b), intent(in) :: ith,iph
     real(dp) :: val
     val = self%rdata(self%index(iph,ith,1)) 
     return
   end function get_real_scalar_gauss_legendre_field
 
+  subroutine harmonic_real_scalar_gauss_legendre_field(self,grid,l,m)
+    implicit none
+    class(real_scalar_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b), intent(in) :: l,m
+    integer(i4b) :: ith,iph,klm
+    real(dp) :: ph
+    complex(dpc) :: cfun
+    klm = l*(l+1)/2 + abs(m) + 1
+    do ith = 1,grid%nth
+       do iph = 1,grid%nph
+          ph = grid%ph(iph)
+          if(m >= 0) then
+             cfun = grid%dlm(klm,0,ith)*exp(ii*m*ph)
+          else
+             cfun = (-1)**m*grid%dlm(klm,0,ith)*exp(ii*m*ph)
+          end if
+          call self%set(iph,ith,real(cfun))
+       end do
+    end do
+    return
+  end subroutine harmonic_real_scalar_gauss_legendre_field
+  
+
   ! vector fields
   
-  subroutine allocate_vector_gauss_legendre_field(self,grid,real)
+  subroutine allocate_vector_gauss_legendre_field(self,grid)
     implicit none
     class(vector_gauss_legendre_field), intent(inout) :: self
     type(gauss_legendre_grid), intent(in) :: grid
-    logical, intent(in), optional :: real
-    if(present(real)) then
-       self%real = real
-    end if
-    if(self%real) then
-       call allocate_gauss_legendre_field(self,grid%lmax,1,(/-1/),1)
-    else
-       call allocate_gauss_legendre_field(self,grid%lmax,3,(/-1,0,1/),0)
-    end if
+    call allocate_gauss_legendre_field(self,grid%lmax,3,(/-1,0,1/),0)
     return
   end subroutine allocate_vector_gauss_legendre_field
 
-  subroutine set_value_vector_gauss_legendre_field(self,iph,ith,alpha,val)
+  subroutine set_vector_gauss_legendre_field(self,iph,ith,alpha,val)
     implicit none
     class(vector_gauss_legendre_field), intent(inout) :: self
     integer(i4b), intent(in) :: ith,iph,alpha
     complex(dpc), intent(in) :: val
     integer(i4b) :: icomp
-    if(self%real) then
-       select case(alpha)
-       case(-1)
-          self%cdata(self%index(iph,ith,1)) = val    
-       case(0)
-          self%rdata(self%index(iph,ith,1)) = real(val)
-       case(1)
-          self%cdata(self%index(iph,ith,1)) = -conjg(val)
-       end select
-    else
-       icomp = alpha+2
-       self%cdata(self%index(iph,ith,icomp)) = val
-    end if
+    icomp = alpha+2
+    self%cdata(self%index(iph,ith,icomp)) = val
     return
-  end subroutine set_value_vector_gauss_legendre_field
+  end subroutine set_vector_gauss_legendre_field
 
-  function get_value_vector_gauss_legendre_field(self,iph,ith,alpha) result(val)
+  function get_vector_gauss_legendre_field(self,iph,ith,alpha) result(val)
     implicit none
     class(vector_gauss_legendre_field), intent(in) :: self
     integer(i4b), intent(in) :: ith,iph,alpha
     complex(dpc) :: val
-    integer(i4b) :: icomp
-    if(self%real) then
-       select case(alpha)
-       case(-1)
-          val = self%cdata(self%index(iph,ith,1)) 
-       case(0)
-          val = self%rdata(self%index(iph,ith,1))
-       case(1)
-          val = -conjg(self%cdata(self%index(iph,ith,1)))
-       end select
-    else
-       icomp = alpha+2
-       val = self%cdata(self%index(iph,ith,icomp))
-    end if
+    integer(i4b) :: icomp    
+    icomp = alpha+2
+    val = self%cdata(self%index(iph,ith,icomp))
     return
-  end function get_value_vector_gauss_legendre_field
+  end function get_vector_gauss_legendre_field
 
-
-  ! second order tensor fields
   
-  subroutine allocate_second_tensor_gauss_legendre_field(self,grid,symmetric,trace_free,real)
+  subroutine harmonic_vector_gauss_legendre_field(self,grid,l,m,alpha)
     implicit none
-    class(second_tensor_gauss_legendre_field), intent(inout) :: self
+    class(vector_gauss_legendre_field), intent(inout) :: self
     type(gauss_legendre_grid), intent(in) :: grid
-    logical, intent(in), optional :: symmetric,trace_free,real
-    if(present(symmetric)) then
-       self%symmetric = symmetric
-    end if
-    if(present(trace_free)) then
-       self%trace_free = trace_free
-    end if
-    if(present(real)) then
-       self%real = real
-    end if
-    if(.not.(self%symmetric .or. self%trace_free .or. self%real)) then       
-       call allocate_gauss_legendre_field(self,grid%lmax,9,(/-2,-1,0,-1,0,1,0,1,2/),0)       
-    else
-       stop 'allocate_second_tensor_gauss_legendre_field: invalid allocation choice'
-    end if
-    
+    integer(i4b), intent(in) :: l,m,alpha
+    integer(i4b) :: ith,iph,klm
+    real(dp) :: ph
+    complex(dpc) :: cfun
+    klm = l*(l+1)/2 + abs(m) + 1
+    do ith = 1,grid%nth
+       do iph = 1,grid%nph
+          ph = grid%ph(iph)
+          if(m >= 0) then
+             cfun = grid%dlm(klm,alpha,ith)*exp(ii*m*ph)
+          else
+             cfun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
+          end if
+          call self%set(iph,ith,alpha,cfun)
+       end do
+    end do
     return
-  end subroutine allocate_second_tensor_gauss_legendre_field
+  end subroutine harmonic_vector_gauss_legendre_field
 
-  subroutine set_value_second_tensor_gauss_legendre_field(self,iph,ith,alpha,beta,val)
+
+  ! real vector fields
+  
+  subroutine allocate_real_vector_gauss_legendre_field(self,grid)
     implicit none
-    class(second_tensor_gauss_legendre_field), intent(inout) :: self
+    class(real_vector_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_gauss_legendre_field(self,grid%lmax,1,(/-1/),1)
+    return
+  end subroutine allocate_real_vector_gauss_legendre_field
+
+  subroutine set_real_vector_gauss_legendre_field(self,iph,ith,alpha,val)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(inout) :: self
+    integer(i4b), intent(in) :: ith,iph,alpha
+    complex(dpc), intent(in) :: val
+    select case(alpha)
+    case(-1)
+       self%cdata(self%index(iph,ith,1)) = val
+    case(0)
+       self%rdata(self%index(iph,ith,1)) = real(val)
+    case(1)
+       self%cdata(self%index(iph,ith,1)) = -conjg(val)
+    end select
+    return
+  end subroutine set_real_vector_gauss_legendre_field
+
+  function get_real_vector_gauss_legendre_field(self,iph,ith,alpha) result(val)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(in) :: self
+    integer(i4b), intent(in) :: ith,iph,alpha
+    complex(dpc) :: val
+    integer(i4b) :: icomp    
+    select case(alpha)
+    case(-1)
+       val = self%cdata(self%index(iph,ith,1))
+    case(0)
+       val = self%rdata(self%index(iph,ith,1))
+    case(1)
+       val = -conjg(self%cdata(self%index(iph,ith,1)))
+    end select
+    return
+  end function get_real_vector_gauss_legendre_field
+
+  
+  subroutine harmonic_real_vector_gauss_legendre_field(self,grid,l,m,alpha)
+    implicit none
+    class(real_vector_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b), intent(in) :: l,m,alpha
+    integer(i4b) :: ith,iph,klm
+    real(dp) :: ph
+    complex(dpc) :: cfun
+    klm = l*(l+1)/2 + abs(m) + 1
+    do ith = 1,grid%nth
+       do iph = 1,grid%nph
+          ph = grid%ph(iph)
+          if(m >= 0) then
+             cfun = grid%dlm(klm,alpha,ith)*exp(ii*m*ph)
+          else
+             cfun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
+          end if
+          call self%set(iph,ith,alpha,cfun)
+       end do
+    end do
+    return
+  end subroutine harmonic_real_vector_gauss_legendre_field
+
+
+  ! internal variable fields
+
+  
+  subroutine allocate_internal_variable_gauss_legendre_field(self,grid)
+    implicit none
+    class(internal_variable_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_gauss_legendre_field(self,grid%lmax,2,(/-2,-1/),1)
+    return
+  end subroutine allocate_internal_variable_gauss_legendre_field
+
+  subroutine set_internal_variable_gauss_legendre_field(self,iph,ith,alpha,beta,val)
+    implicit none
+    class(internal_variable_gauss_legendre_field), intent(inout) :: self
     integer(i4b), intent(in) :: ith,iph,alpha,beta
     complex(dpc), intent(in) :: val
-    integer(i4b) :: icomp
-    icomp = 3*(beta+1) + alpha + 2
-    self%cdata(self%index(iph,ith,icomp)) = val    
+    if(alpha == -1 .and. beta == -1) then
+       self%cdata(self%index(iph,ith,1)) = val       
+    else if(alpha == 0 .and. beta == -1) then
+       self%cdata(self%index(iph,ith,2)) = val       
+    else if(alpha == 0 .and. beta == 0) then
+       self%rdata(self%index(iph,ith,1)) = real(val)
+    end if
     return
-  end subroutine set_value_second_tensor_gauss_legendre_field
+  end subroutine set_internal_variable_gauss_legendre_field
 
-  function get_value_second_tensor_gauss_legendre_field(self,iph,ith,alpha,beta) result(val)
+  function get_internal_variable_gauss_legendre_field(self,iph,ith,alpha,beta) result(val)
     implicit none
-    class(second_tensor_gauss_legendre_field), intent(in) :: self
+    class(internal_variable_gauss_legendre_field), intent(in) :: self
     integer(i4b), intent(in) :: ith,iph,alpha,beta
     complex(dpc) :: val
-    integer(i4b) :: icomp
-    icomp = 3*(beta+1) + alpha + 2
-    val = self%cdata(self%index(iph,ith,icomp)) 
+    integer(i4b) :: icomp    
+    if(alpha == -1 .and. beta == -1) then
+       val = self%cdata(self%index(iph,ith,1))        
+    else if(alpha == 0 .and. beta == -1) then
+       val = self%cdata(self%index(iph,ith,2))
+    else if(alpha == 0 .and. beta == 0) then
+       val = self%rdata(self%index(iph,ith,1)) 
+    end if
     return
-  end function get_value_second_tensor_gauss_legendre_field
-
-
-
+  end function get_internal_variable_gauss_legendre_field
 
   
+  subroutine harmonic_internal_variable_gauss_legendre_field(self,grid,l,m,alpha,beta)
+    implicit none
+    class(internal_variable_gauss_legendre_field), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b), intent(in) :: l,m,alpha,beta
+    integer(i4b) :: ith,iph,klm
+    real(dp) :: ph
+    complex(dpc) :: cfun
+    klm = l*(l+1)/2 + abs(m) + 1
+    do ith = 1,grid%nth
+       do iph = 1,grid%nph
+          ph = grid%ph(iph)
+          if(m >= 0) then
+             cfun = grid%dlm(klm,alpha+beta,ith)*exp(ii*m*ph)
+          else
+             cfun = (-1)**(m+alpha)*grid%dlm(klm,-alpha,ith)*exp(ii*m*ph)
+          end if
+          call self%set(iph,ith,alpha,beta,cfun)
+       end do
+    end do
+    return
+  end subroutine harmonic_internal_variable_gauss_legendre_field
+
   
   
   !=======================================================================!
@@ -1087,30 +1234,30 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     if(.not.self%allocated) return
     deallocate(self%cdata)
-    deallocate(self%cnval)
+    deallocate(self%nval)
     deallocate(self%rdata)
     self%allocated = .false.
     return
   end subroutine delete_spherical_harmonic_expansion
 
 
-  subroutine allocate_spherical_harmonic_expansion(self,lmax,nc,cnval,nr)
+  subroutine allocate_spherical_harmonic_expansion(self,lmax,nc,nval,nr)
     implicit none
     class(spherical_harmonic_expansion), intent(inout) :: self
     integer(i4b), intent(in) :: lmax
     integer(i4b), intent(in) :: nc
-    integer(i4b), dimension(nc), intent(in) :: cnval
+    integer(i4b), dimension(nc), intent(in) :: nval
     integer(i4b), intent(in) :: nr
     call self%delete()
     self%lmax= lmax
     self%nc = nc
     self%cncoef = (lmax+1)**2
     self%cdim = nc*self%cncoef
-    allocate(self%cnval(nc))
+    allocate(self%nval(nc))
     allocate(self%cdata(self%cdim))
     if(nc > 0) then
        self%cdata = 0.0_dp
-       self%cnval = cnval
+       self%nval = nval
     end if
     self%nr = nr
     self%rncoef = ((lmax+1)*(lmax+2))/2
@@ -1148,12 +1295,12 @@ contains
   end function rindex_spherical_harmonic_expansion
   
   
-  subroutine set_sobolev_spherical_harmonic_expansion(u,s,mu)
+  subroutine set_sobolev_spherical_harmonic_expansion(self,s,mu)
     implicit none
-    class(spherical_harmonic_expansion), intent(inout) :: u
+    class(spherical_harmonic_expansion), intent(inout) :: self
     real(dp), intent(in) :: s,mu
-    u%s  = s
-    u%mu = mu
+    self%s  = s
+    self%mu = mu
     return
   end subroutine set_sobolev_spherical_harmonic_expansion
 
@@ -1162,6 +1309,7 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     complex(dpc), intent(in) :: a
     call zscal(self%cdim,a,self%cdata,1)
+    call dscal(self%rdim,real(a,kind=dp),self%rdata,1)
     return
   end subroutine scale_spherical_harmonic_expansion
 
@@ -1170,6 +1318,7 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     real(dp), intent(in) :: a
     call zdscal(self%cdim,a,self%cdata,1)
+    call dscal(self%rdim,a,self%rdata,1)
     return
   end subroutine real_scale_spherical_harmonic_expansion
 
@@ -1179,6 +1328,7 @@ contains
     complex(dpc), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: other
     call zaxpy(self%cdim,a,other%cdata,1,self%cdata,1)
+    call daxpy(self%rdim,real(a,kind=dp),other%rdata,1,self%rdata,1)
     return
   end subroutine saxpy_spherical_harmonic_expansion
 
@@ -1187,12 +1337,57 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     real(dp), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: other
-    complex(dpc) :: aloc
-    aloc = a
-    call zaxpy(self%cdim,aloc,other%cdata,1,self%cdata,1)
+    complex(dpc) :: ac
+    ac = a
+    call zaxpy(self%cdim,ac,other%cdata,1,self%cdata,1)
+    call daxpy(self%rdim,a,other%rdata,1,self%rdata,1)
     return
   end subroutine real_saxpy_spherical_harmonic_expansion
 
+
+  subroutine random_values_spherical_harmonic_expansion(self)
+    implicit none
+    class(spherical_harmonic_expansion), intent(inout) :: self
+
+    integer(i4b) :: icomp,l,m
+    real(dp) :: rand1,rand2
+    complex(dpc) :: cfun
+    
+    do icomp = 1,self%nr
+       do l = 0,self%lmax
+          do m = 0,l
+             call random_number(rand1)
+             rand1 = 2.0_dp*(rand1-0.5_dp)
+             if(m == 0 .or. m == self%lmax) then
+                rand2 = 0
+             else
+                call random_number(rand2)
+                rand2 = 2.0_dp*(rand2-0.5_dp)
+             end if
+             cfun = (rand1+ii*rand2)*(1.0_dp+self%mu*l*(l+1))**(-self%s)
+             self%rdata(self%rindex(m,l,icomp)) = cfun
+          end do
+       end do
+    end do
+
+    do icomp = 1,self%nc
+       do l = abs(self%nval(icomp)),self%lmax
+          do m = -l,l
+             if(m == -self%lmax) cycle
+             call random_number(rand1)
+             call random_number(rand2)
+             rand1 = 2.0_dp*(rand1-0.5_dp)
+             rand2 = 2.0_dp*(rand2-0.5_dp)
+             cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
+             self%cdata(self%cindex(m,l,icomp)) = cfun
+          end do
+       end do
+    end do
+    
+    
+    return
+  end subroutine random_values_spherical_harmonic_expansion
+  
 
   !------------------------------------------------------!
   !            procedures for derived types              !
@@ -1201,157 +1396,208 @@ contains
 
   ! scalar fields
   
-  subroutine allocate_scalar_spherical_harmonic_expansion(self,grid,real)
+  subroutine allocate_scalar_spherical_harmonic_expansion(self,grid)
     implicit none
     class(scalar_spherical_harmonic_expansion), intent(inout) :: self
     type(gauss_legendre_grid), intent(in) :: grid
-    logical, intent(in), optional :: real
-    integer(i4b), dimension(0) :: null
-    if(present(real)) then
-       self%real = real
-    end if
-    if(self%real) then
-       call allocate_spherical_harmonic_expansion(self,grid%lmax,0,null,1)
-    else
-       call allocate_spherical_harmonic_expansion(self,grid%lmax,1,(/0/),0)
-    end if
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,1,(/0/),0)
     return
   end subroutine allocate_scalar_spherical_harmonic_expansion
 
-  subroutine set_complex_scalar_spherical_harmonic_expansion(self,l,m,val)
+  subroutine set_scalar_spherical_harmonic_expansion(self,l,m,val)
     implicit none
     class(scalar_spherical_harmonic_expansion), intent(inout) :: self
     integer(i4b), intent(in) :: l,m
     complex(dpc), intent(in) :: val
-    if(self%real) then
-       self%rdata(self%rindex(m,l,1)) = val
-    else       
-       self%cdata(self%cindex(m,l,1)) = val
-    end if
+    self%cdata(self%cindex(m,l,1)) = val
     return
-  end subroutine set_complex_scalar_spherical_harmonic_expansion
+  end subroutine set_scalar_spherical_harmonic_expansion
 
-  function get_complex_scalar_spherical_harmonic_expansion(self,l,m) result(val)
+  function get_scalar_spherical_harmonic_expansion(self,l,m) result(val)
     implicit none
     class(scalar_spherical_harmonic_expansion), intent(in) :: self
     integer(i4b), intent(in) :: l,m
     complex(dpc) :: val
-    if(self%real) then
-       val = self%rdata(self%rindex(m,l,1))
+    val = self%cdata(self%cindex(m,l,1))
+    return
+  end function get_scalar_spherical_harmonic_expansion
+
+
+
+
+  ! real scalar fields
+  
+  subroutine allocate_real_scalar_spherical_harmonic_expansion(self,grid)
+    implicit none
+    class(real_scalar_spherical_harmonic_expansion), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b), dimension(0) :: null
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,0,null,1)
+    return
+  end subroutine allocate_real_scalar_spherical_harmonic_expansion
+
+  subroutine set_real_scalar_spherical_harmonic_expansion(self,l,m,val)
+    implicit none
+    class(real_scalar_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: l,m
+    complex(dpc), intent(in) :: val
+    if(m >= 0) then
+       self%rdata(self%rindex(m,l,1)) = val
     else
-       val = self%cdata(self%cindex(m,l,1))
+       self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
     end if
     return
-  end function get_complex_scalar_spherical_harmonic_expansion
+  end subroutine set_real_scalar_spherical_harmonic_expansion
+
+  function get_real_scalar_spherical_harmonic_expansion(self,l,m) result(val)
+    implicit none
+    class(real_scalar_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: l,m
+    complex(dpc) :: val
+    if(m >= 0) then
+       val = self%rdata(self%rindex(m,l,1))
+    else
+       val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+    end if
+    return
+  end function get_real_scalar_spherical_harmonic_expansion
 
 
   ! vector fields
   
-  subroutine allocate_vector_spherical_harmonic_expansion(self,grid,real)
+  subroutine allocate_vector_spherical_harmonic_expansion(self,grid)
     implicit none
     class(vector_spherical_harmonic_expansion), intent(inout) :: self
     type(gauss_legendre_grid), intent(in) :: grid
-    logical, intent(in), optional :: real
-    if(present(real)) then
-       self%real = real
-    end if
-    if(self%real) then
-       call allocate_spherical_harmonic_expansion(self,grid%lmax,1,(/-1/),1)
-    else
-       call allocate_spherical_harmonic_expansion(self,grid%lmax,3,(/-1,0,1/),0)
-    end if
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,3,(/-1,0,1/),0)
     return
   end subroutine allocate_vector_spherical_harmonic_expansion
 
-  subroutine set_value_vector_spherical_harmonic_expansion(self,l,m,alpha,val)
+  subroutine set_vector_spherical_harmonic_expansion(self,l,m,alpha,val)
     implicit none
     class(vector_spherical_harmonic_expansion), intent(inout) :: self
     integer(i4b), intent(in) :: l,m,alpha
     complex(dpc), intent(in) :: val
-    integer(i4b) :: icomp,sign
-    if(self%real) then
-       select case(alpha)
-       case(-1)
-          self%cdata(self%cindex(m,l,1)) = val    
-       case(0)
-          self%rdata(self%rindex(m,l,1)) = val
-       case(1)
-          if(modulo(m,2) == 0) then
-             sign = 1
-          else
-             sign = -1
-          end if
-          self%cdata(self%cindex(-m,l,1)) = sign*conjg(val)
-       end select
-    else
-       icomp = alpha+2
-       self%cdata(self%cindex(m,l,icomp)) = val
-    end if
+    integer(i4b) :: icomp
+    icomp = alpha+2
+    self%cdata(self%cindex(m,l,icomp)) = val
     return
-  end subroutine set_value_vector_spherical_harmonic_expansion
+  end subroutine set_vector_spherical_harmonic_expansion
 
-  function get_value_vector_spherical_harmonic_expansion(self,l,m,alpha) result(val)
+  function get_vector_spherical_harmonic_expansion(self,l,m,alpha) result(val)
     implicit none
     class(vector_spherical_harmonic_expansion), intent(in) :: self
     integer(i4b), intent(in) :: l,m,alpha
     complex(dpc) :: val
-    integer(i4b) :: icomp,sign
-    if(self%real) then
-       select case(alpha)
-       case(-1)
-          val = self%cdata(self%cindex(m,l,1))
-       case(0)
-          val = self%rdata(self%rindex(m,l,1))
-       case(1)
-          if(modulo(m,2) == 0) then
-             sign = 1
-          else
-             sign = -1
-          end if
-          val = sign*conjg(self%cdata(self%cindex(-m,l,1)))
-       end select
-    else
-       icomp = alpha+2
-       val = self%cdata(self%cindex(m,l,icomp))
-    end if
+    integer(i4b) :: icomp
+    icomp = alpha+2
+    val = self%cdata(self%cindex(m,l,icomp))
     return
-  end function get_value_vector_spherical_harmonic_expansion
-  
-  ! second order tensor fields
-  
-  subroutine allocate_second_tensor_spherical_harmonic_expansion(self,grid)
-    implicit none
-    class(second_tensor_spherical_harmonic_expansion), intent(inout) :: self
-    type(gauss_legendre_grid), intent(in) :: grid
-    call allocate_spherical_harmonic_expansion(self,grid%lmax,9,(/-2,-1,0,-1,0,1,0,1,2/),0)
-    return
-  end subroutine allocate_second_tensor_spherical_harmonic_expansion
+  end function get_vector_spherical_harmonic_expansion
 
-  subroutine set_value_second_tensor_spherical_harmonic_expansion(self,l,m,alpha,beta,val)
+
+  ! real vector fields
+  
+  subroutine allocate_real_vector_spherical_harmonic_expansion(self,grid)
     implicit none
-    class(second_tensor_spherical_harmonic_expansion), intent(inout) :: self
+    class(real_vector_spherical_harmonic_expansion), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,1,(/-1/),1)
+    return
+  end subroutine allocate_real_vector_spherical_harmonic_expansion
+
+  subroutine set_real_vector_spherical_harmonic_expansion(self,l,m,alpha,val)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(inout) :: self
+    integer(i4b), intent(in) :: l,m,alpha
+    complex(dpc), intent(in) :: val        
+    select case(alpha)
+    case(-1)
+       self%cdata(self%cindex(m,l,1)) = val
+    case(0)
+       if(m >= 0) then
+          self%rdata(self%rindex(m,l,1)) = val
+       else
+          self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
+       endif
+    case(1)
+       self%rdata(self%rindex(m,l,1)) = -(-1)**m*conjg(val)
+    end select
+    return
+  end subroutine set_real_vector_spherical_harmonic_expansion
+
+  function get_real_vector_spherical_harmonic_expansion(self,l,m,alpha) result(val)
+    implicit none
+    class(real_vector_spherical_harmonic_expansion), intent(in) :: self
+    integer(i4b), intent(in) :: l,m,alpha
+    complex(dpc) :: val
+    select case(alpha)
+    case(-1)
+       val = self%cdata(self%cindex(m,l,1))
+    case(0)
+       if(m >= 0) then
+          val = self%rdata(self%rindex(m,l,1))
+       else
+          val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+       end if
+    case(1)
+       val = -(-1)**m*conjg(self%cdata(self%cindex(m,l,1)))
+    end select
+    return
+  end function get_real_vector_spherical_harmonic_expansion
+
+
+
+
+  ! internal variable fields
+
+  
+  subroutine allocate_internal_variable_spherical_harmonic_expansion(self,grid)
+    implicit none
+    class(internal_variable_spherical_harmonic_expansion), intent(inout) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    call allocate_spherical_harmonic_expansion(self,grid%lmax,2,(/-2,-1/),1)
+    return
+  end subroutine allocate_internal_variable_spherical_harmonic_expansion
+
+  subroutine set_internal_variable_spherical_harmonic_expansion(self,l,m,alpha,beta,val)
+    implicit none
+    class(internal_variable_spherical_harmonic_expansion), intent(inout) :: self
     integer(i4b), intent(in) :: l,m,alpha,beta
     complex(dpc), intent(in) :: val
-    integer(i4b) :: icomp
-    icomp = 3*(beta+1) + alpha + 2
-    self%cdata(self%cindex(m,l,icomp)) = val    
+    if(alpha == -1 .and. beta == -1) then
+       self%cdata(self%cindex(m,l,1)) = val
+    else if(alpha == 0 .and. beta == -1) then
+       self%cdata(self%cindex(m,l,2)) = val       
+    else if(alpha == 0 .and. beta == 0) then
+       if(m >= 0) then
+          self%rdata(self%rindex(m,l,1)) = val
+       else
+          self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
+       end if
+    end if    
     return
-  end subroutine set_value_second_tensor_spherical_harmonic_expansion
+  end subroutine set_internal_variable_spherical_harmonic_expansion
 
-  function get_value_second_tensor_spherical_harmonic_expansion(self,l,m,alpha,beta) result(val)
+  function get_internal_variable_spherical_harmonic_expansion(self,l,m,alpha,beta) result(val)
     implicit none
-    class(second_tensor_spherical_harmonic_expansion), intent(in) :: self
+    class(internal_variable_spherical_harmonic_expansion), intent(in) :: self
     integer(i4b), intent(in) :: l,m,alpha,beta
     complex(dpc) :: val
-    integer(i4b) :: icomp
-    icomp = 3*(beta+1) + alpha + 2
-    val = self%cdata(self%cindex(m,l,icomp)) 
+    if(alpha == -1 .and. beta == -1) then
+       val = self%cdata(self%cindex(m,l,1)) 
+    else if(alpha == 0 .and. beta == -1) then
+       val = self%cdata(self%cindex(m,l,2)) 
+    else if(alpha == 0 .and. beta == 0) then
+       if(m >= 0) then
+          val = self%rdata(self%rindex(m,l,1))
+       else
+          val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+       end if
+    end if    
     return
-  end function get_value_second_tensor_spherical_harmonic_expansion
+  end function get_internal_variable_spherical_harmonic_expansion
 
-
-
-  
   
 end module module_spherical_harmonics
 

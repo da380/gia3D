@@ -5,6 +5,17 @@ module module_util
 
 contains
 
+  function poly_eval(n,coef,x) result(y)
+    real(dp), dimension(n), intent(in) :: coef
+    real(dp), intent(in) :: X
+    real(dp) :: y
+    integer(i4b) :: i
+    y = coef(n)
+    do i = n-1,1,-1
+       y = coef(i) + x*y
+    end do
+  end function poly_eval
+
 
   function bisect_list(xx,x) result(il)
     implicit none
