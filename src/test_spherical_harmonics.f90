@@ -36,7 +36,7 @@ program test_spherical_harmonics
 
   
   ! make the grid  
-  lmax = 512
+  lmax = 256
   nmax = 2
   print *, 'building the grid for degree ',lmax
   call cpu_time(start)

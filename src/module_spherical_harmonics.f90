@@ -26,12 +26,16 @@ module module_spherical_harmonics
      procedure :: allocate =>  allocate_gauss_legendre_grid
      procedure :: ph =>  ph_gauss_legednre_grid
      procedure :: SH_trans_gauss_legendre_grid
+     procedure :: real_SH_trans_gauss_legendre_grid
      procedure :: wrapper_SH_trans_gauss_legendre_grid
      generic :: SH_trans => SH_trans_gauss_legendre_grid,        &
+                            real_SH_trans_gauss_legendre_grid,   &
                             wrapper_SH_trans_gauss_legendre_grid
      procedure :: SH_itrans_gauss_legendre_grid
+     procedure :: real_SH_itrans_gauss_legendre_grid
      procedure :: wrapper_SH_itrans_gauss_legendre_grid
      generic :: SH_itrans => SH_itrans_gauss_legendre_grid,        &
+                             real_SH_itrans_gauss_legendre_grid,   &
                             wrapper_SH_itrans_gauss_legendre_grid
      
   end type gauss_legendre_grid
@@ -42,6 +46,20 @@ module module_spherical_harmonics
   !===============================================================!
 
   type, abstract :: gauss_legendre_field
+     !
+     ! Complex components are stored within the complex array cdata
+     ! the index of the (iph,ith,icomp) value is:
+     !
+     ! i = nph*nth*(icomp-1) + nph*(ith-1) + iph
+     !
+     ! This index can be accessed easily using the procedure self%index(iph,ith,icomp)
+     !
+     ! Note that values for increasing iph and fixed (icomp,ith) are contiguous
+     ! Each complex component needs to have an n value which is stored in the array nval
+     !
+     ! Real components are stored in the same manner, but in the real array rdata. All
+     ! such components have upper index 0, and so this isn't stored.
+     !
      logical :: allocated = .false.
      integer(i4b) :: lmax
      integer(i4b) :: nth
@@ -115,6 +133,31 @@ module module_spherical_harmonics
   !===============================================================!
   
   type, abstract :: spherical_harmonic_expansion
+     !
+     ! Complex componets are stored in the complex array cdata
+     ! values are stored in blocks for each component. For each
+     ! such component the ordering of the spherical harmonics is
+     ! as follows:
+     !
+     ! (0,0),(1,0),(1,1),(1,-1),(2,0),(2,1),(2,-1),(2,2),(2,-2),...
+     !
+     ! To get the indices easily, there is the procedure self%cindex(m,l,icomp)
+     ! note the ordering of order and degree within this function
+     !
+     ! for components with |n| > 0 there are no coefficients when l < |n|
+     ! within the storage arrays these elements are present, but should
+     ! not be accessed by anything. 
+     !
+     ! Real components are stored in the complex array rdata. Note
+     ! that these coefficients are still complex numbers, but they
+     ! for real-valued fields and the symmetry between postive and
+     ! negative orders is used to reduce storage. Again, storage is
+     ! in blocks for each component, with the ordering then being:
+     !
+     ! (0,0),(1,0),(1,1),(2,0),(2,1),(2,2),...
+     !
+     ! To get the indices easily, there is the proceedure self%rindex(m,l,icomp)
+     !
      logical :: allocated
      integer(i4b) :: lmax
      real(dp) :: s = 0.0_dp
