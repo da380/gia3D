@@ -1170,10 +1170,22 @@ contains
     complex(dpc), intent(in) :: val
     if(alpha == -1 .and. beta == -1) then
        self%cdata(self%index(iph,ith,1)) = val       
-    else if(alpha == 0 .and. beta == -1) then
-       self%cdata(self%index(iph,ith,2)) = val       
+    else if(alpha == 0 .and. beta == -1) then       
+       self%cdata(self%index(iph,ith,2)) = val
+    else if(alpha == 1 .and. beta == -1) then
+       self%rdata(self%index(iph,ith,1)) = 2.0_dp*real(val)
+    else if(alpha == -1 .and. beta == 0) then
+       self%cdata(self%index(iph,ith,2)) = val
     else if(alpha == 0 .and. beta == 0) then
        self%rdata(self%index(iph,ith,1)) = real(val)
+    else if(alpha == 1 .and. beta == 0) then
+       self%cdata(self%index(iph,ith,2)) = -conjg(val)
+    else if(alpha == -1 .and. beta == 1) then
+       self%rdata(self%index(iph,ith,1)) = 2.0_dp*real(val)
+    else if(alpha == 0 .and. beta == 1) then
+       self%cdata(self%index(iph,ith,2)) = -conjg(val)
+    else if(alpha == 1 .and. beta == 1) then
+       self%cdata(self%index(iph,ith,1)) = conjg(val)
     end if
     return
   end subroutine set_internal_variable_gauss_legendre_field
@@ -1185,11 +1197,23 @@ contains
     complex(dpc) :: val
     integer(i4b) :: icomp    
     if(alpha == -1 .and. beta == -1) then
-       val = self%cdata(self%index(iph,ith,1))        
+       val = self%cdata(self%index(iph,ith,1))
     else if(alpha == 0 .and. beta == -1) then
        val = self%cdata(self%index(iph,ith,2))
+    else if(alpha == 1 .and. beta == -1) then
+       val = 0.5_dp*self%rdata(self%index(iph,ith,1))
+    else if(alpha == -1 .and. beta == 0) then
+       val = self%cdata(self%index(iph,ith,2))
     else if(alpha == 0 .and. beta == 0) then
-       val = self%rdata(self%index(iph,ith,1)) 
+       val = self%rdata(self%index(iph,ith,1))
+    else if(alpha == 1 .and. beta == 0) then
+       val = -conjg(self%cdata(self%index(iph,ith,2)))
+    else if(alpha == -1 .and. beta == 1) then
+       val = 0.5_dp*self%rdata(self%index(iph,ith,1))
+    else if(alpha == 0 .and. beta == 1) then
+       val = -conjg(self%cdata(self%index(iph,ith,2)))
+    else if(alpha == 1 .and. beta == 1) then
+       val = conjg(self%cdata(self%index(iph,ith,1)))
     end if
     return
   end function get_internal_variable_gauss_legendre_field
@@ -1521,7 +1545,7 @@ contains
           self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
        endif
     case(1)
-       self%rdata(self%rindex(m,l,1)) = -(-1)**m*conjg(val)
+       self%cdata(self%cindex(-m,l,1)) = (-1)**m*conjg(val)
     end select
     return
   end subroutine set_real_vector_spherical_harmonic_expansion
@@ -1541,7 +1565,7 @@ contains
           val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
        end if
     case(1)
-       val = -(-1)**m*conjg(self%cdata(self%cindex(m,l,1)))
+       val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,1)))
     end select
     return
   end function get_real_vector_spherical_harmonic_expansion
@@ -1568,13 +1592,33 @@ contains
     if(alpha == -1 .and. beta == -1) then
        self%cdata(self%cindex(m,l,1)) = val
     else if(alpha == 0 .and. beta == -1) then
-       self%cdata(self%cindex(m,l,2)) = val       
+       self%cdata(self%cindex(m,l,2)) = val
+    else if(alpha == 1 .and. beta == -1) then
+       if(m >= 0) then
+          self%rdata(self%rindex(m,l,1)) = 2.0_dp*val
+       else
+          self%rdata(self%rindex(abs(m),l,1)) = 2.0_dp*(-1)**m*conjg(val)
+       end if
+    else if(alpha == -1 .and. beta == 0) then
+       self%cdata(self%cindex(m,l,2)) = val
     else if(alpha == 0 .and. beta == 0) then
        if(m >= 0) then
           self%rdata(self%rindex(m,l,1)) = val
        else
           self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
        end if
+    else if(alpha == 1 .and. beta == 0) then
+       self%cdata(self%cindex(-m,l,2)) = (-1)**m*conjg(val)
+    else if(alpha == -1 .and. beta == 1) then
+       if(m >= 0) then
+          self%rdata(self%rindex(m,l,1)) = 2.0_dp*val
+       else
+          self%rdata(self%rindex(abs(m),l,1)) = 2.0_dp*(-1)**m*conjg(val)
+       end if
+    else if(alpha == 0 .and. beta == 1) then
+       self%cdata(self%cindex(-m,l,2)) = (-1)**m*conjg(val)
+    else if(alpha == 1 .and. beta == 1) then
+       self%cdata(self%cindex(-m,l,1)) = (-1)**m*conjg(val)
     end if    
     return
   end subroutine set_internal_variable_spherical_harmonic_expansion
@@ -1588,12 +1632,32 @@ contains
        val = self%cdata(self%cindex(m,l,1)) 
     else if(alpha == 0 .and. beta == -1) then
        val = self%cdata(self%cindex(m,l,2)) 
+    else if(alpha == 1 .and. beta == -1) then
+       if(m >= 0) then
+          val = 0.5_dp*self%rdata(self%rindex(m,l,1)) 
+       else
+          val = 0.5_dp*(-1)**m*conjg(self%rdata(self%rindex(-m,l,1)))
+       end if
+    else if(alpha == -1 .and. beta == 0) then
+       val = self%cdata(self%cindex(m,l,2)) 
     else if(alpha == 0 .and. beta == 0) then
        if(m >= 0) then
-          val = self%rdata(self%rindex(m,l,1))
+          val = self%rdata(self%rindex(m,l,1)) 
        else
-          val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+          val = (-1)**m*conjg(self%rdata(self%rindex(-m,l,1)))
        end if
+    else if(alpha == 1 .and. beta == 0) then
+       val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,2)))
+    else if(alpha == -1 .and. beta == 1) then
+       if(m >= 0) then
+          val = 0.5_dp*self%rdata(self%rindex(m,l,1)) 
+       else
+          val = 0.5_dp*(-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+       end if
+    else if(alpha == 0 .and. beta == 1) then
+       val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,2)))
+    else if(alpha == 1 .and. beta == 1) then
+       val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,1)))
     end if    
     return
   end function get_internal_variable_spherical_harmonic_expansion

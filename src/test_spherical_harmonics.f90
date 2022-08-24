@@ -354,8 +354,8 @@ program test_spherical_harmonics
   !=============================================================!
   
   ! set a function
-  alpha = -1
-  beta  = -1
+  alpha =  0
+  beta  =  -1
   l = lmax-1
   m = lmax/4
   call c%harmonic(grid,l,m,alpha,beta)
