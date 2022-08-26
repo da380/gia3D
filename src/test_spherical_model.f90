@@ -10,7 +10,7 @@ program test_spherical_model
   class(spherical_elastic_model), allocatable :: deck_model
 
   model =  set_elastic_PREM()
-  call model%write(200,'prem.200')
+  call model%write(200,'prem.200')!,isotropic = .true.)
   deck_model = set_elastic_deck_model('prem.200') 
 
 
@@ -21,7 +21,7 @@ program test_spherical_model
      dr = (r2-r1)/(nr-1)
      do ir = 1,nr
         r = r1+(ir-1)*dr
-        write(99,*) r*length_norm,deck_model%rho(ilayer,r)
+        write(99,*) r*length_norm,model%kappa(ilayer,r)-deck_model%kappa(ilayer,r)
      end do
   end do
   close(99)

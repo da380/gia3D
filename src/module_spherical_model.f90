@@ -400,12 +400,12 @@ contains
        do iloc = 1,nloc
           r = r1 + (iloc-1)*dr
           if(iso) then             
-             write(io,'(4e20.8)') r*length_norm,                     &
+             write(io,'(4e20.8)') r*length_norm,            &
                          self%rho(ilayer,r)*density_norm,   &
                          self%kappa(ilayer,r)*modulus_norm, &
                          self%mu(ilayer,r)*modulus_norm
           else
-             write(io,'(7e20.8)') r*length_norm,                     &
+             write(io,'(7e20.8)') r*length_norm,            &
                          self%rho(ilayer,r)*density_norm,   &
                          self%A(ilayer,r)*modulus_norm,     &
                          self%C(ilayer,r)*modulus_norm,     &
@@ -454,6 +454,7 @@ contains
     do i = 1,nknot
        if(iso) then
           read(io,*) r(i),rho(i),A(i),L(i)
+          A(i) = A(i) + 4.0_dp*L(i)/3.0_dp
           C(i) = A(i)
           N(i) = L(i)
           F(i) = A(i)-2.0_dp*L(i)
@@ -685,8 +686,6 @@ contains
     return
   end function rho_elastic_PREM
 
-
-  
 
   function A_elastic_PREM(self,i,r) result(A)
     class(elastic_PREM), intent(in) :: self
