@@ -1,7 +1,7 @@
 module module_physical_constants
 
   use module_constants
-
+  implicit none
 
   
   ! values for some useful physical constants in SI units
@@ -17,9 +17,6 @@ module module_physical_constants
   real(qp), parameter :: G_qp = 6.6743e-11_qp
   real(qp), parameter :: c_qp = 299792458_qp
   real(qp), parameter :: h_qp = 6.62607015e-34_qp
-
-
-
 
   
 end module module_physical_constants

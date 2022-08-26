@@ -4,7 +4,6 @@ module module_quadrature
   implicit none
   
   type, abstract :: quadrature
-     private
      logical :: allocated = .false.
      integer(i4b) :: n
      real(dp) :: a,b

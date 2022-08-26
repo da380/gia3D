@@ -247,6 +247,8 @@ contains
     deallocate(grid%th,grid%w,grid%dlm)
     call fftw_destroy_plan(grid%plan_forward)
     call fftw_destroy_plan(grid%plan_backward)
+    call fftw_destroy_plan(grid%plan_r2c)
+    call fftw_destroy_plan(grid%plan_c2r)
     grid%allocated = .false.
     return
   end subroutine delete_gauss_legendre_grid

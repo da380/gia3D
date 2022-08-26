@@ -33,7 +33,7 @@ SRCS = test_special_functions.f90    \
        test_fftw3.f90                \
        test_spherical_harmonics.f90  \
        test_wigner.f90               \
-       test_spherical_model.f90
+       test_spherical_model.f90     
 
 
 ###########################################################

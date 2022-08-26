@@ -99,9 +99,6 @@ contains
 
     integer(i4b) :: il,iu,im,n
 
-    ! check the interpolation is set up
-    call error(.not.self%built,'fint_interp_1D','interpolation not set up')
-
     ! is it worth hunting? 
     if(self%isave /= 0 .and. abs(x-self%xsave) > self%dxsave) then
        self%isave = 0
@@ -124,9 +121,6 @@ contains
 
     integer(i4b) :: i
     real(dp) :: x1,x2,y1,y2,y
-    
-    ! check the interpolation is set up
-    call error(.not.self%built,'fint_interp_1D','interpolation not set up')
     
     i  = self%find(x)
     x1 = self%xx(i)
@@ -230,9 +224,6 @@ contains
     integer(i4b) :: i1,i2
     real(dp) :: a,b,h,x1,x2,y1,y2,y21,y22
 
-    ! check the interpolation is set up
-    call error(.not.self%built,'fint_interp_1D','interpolation not set up')
-    
     ! get the indices and points
     i1 = self%find(x)
     i2 = i1+1
