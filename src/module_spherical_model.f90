@@ -20,7 +20,7 @@ module module_spherical_model
   real(dp), parameter :: gravitational_potential_norm = length_norm**2/time_norm**2
   real(dp), parameter :: gravitational_constant_norm = length_norm**3/(mass_norm*time_norm**2)
   real(dp), parameter :: modulus_norm = mass_norm/(time_norm**2*length_norm)
-
+  real(dp), parameter :: viscosity_norm = mass_norm/(time_norm*length_norm)
 
   !==============================================================!
   !           type decalaration for elastic models               !
@@ -57,6 +57,7 @@ module module_spherical_model
      procedure :: write => write_spherical_elastic_model
   end type spherical_elastic_model
 
+  
   abstract interface
      function spherical_elastic_model_function(self,i,r) result(f)
        use module_constants
@@ -68,7 +69,27 @@ module module_spherical_model
      end function spherical_elastic_model_function
   end interface
 
+  
+  type, abstract, extends(spherical_elastic_model) :: spherical_maxwell_model
+     logical, dimension(:), allocatable :: region_viscous
+     logical, dimension(:), allocatable :: layer_viscous
+   contains
+     procedure(spherical_maxwell_model_function), deferred :: eta
+     procedure :: write => write_spherical_maxwell_model
+  end type spherical_maxwell_model
 
+
+  abstract interface
+     function spherical_maxwell_model_function(self,i,r) result(f)
+       use module_constants
+       import :: spherical_maxwell_model
+       class(spherical_maxwell_model), intent(in) :: self
+       integer(i4b), intent(in) :: i
+       real(dp), intent(in) :: r
+       real(dp) :: f       
+     end function spherical_maxwell_model_function
+  end interface
+  
   !==============================================================!
   !                          Deck models                         !
   !==============================================================!
@@ -89,8 +110,34 @@ module module_spherical_model
      procedure :: N =>  N_elastic_deck_model
   end type elastic_deck_model
   
-  
+  interface elastic_deck_model
+     procedure :: set_elastic_deck_model
+  end interface elastic_deck_model
 
+
+  type, extends(spherical_maxwell_model) :: maxwell_deck_model
+     type(interp_1D_cubic), dimension(:), allocatable :: rho_cubic
+     type(interp_1D_cubic), dimension(:), allocatable :: A_cubic
+     type(interp_1D_cubic), dimension(:), allocatable :: C_cubic
+     type(interp_1D_cubic), dimension(:), allocatable :: F_cubic
+     type(interp_1D_cubic), dimension(:), allocatable :: L_cubic
+     type(interp_1D_cubic), dimension(:), allocatable :: N_cubic
+     type(interp_1D_cubic), dimension(:), allocatable :: eta_cubic
+   contains
+     procedure :: rho =>  rho_maxwell_deck_model
+     procedure :: A =>  A_maxwell_deck_model
+     procedure :: C =>  C_maxwell_deck_model
+     procedure :: F =>  F_maxwell_deck_model
+     procedure :: L =>  L_maxwell_deck_model
+     procedure :: N =>  N_maxwell_deck_model
+     procedure :: eta => eta_maxwell_deck_model
+  end type maxwell_deck_model
+
+
+  interface maxwell_deck_model
+     procedure :: set_maxwell_deck_model
+  end interface maxwell_deck_model
+  
   !==============================================================!
   !                          PREM model                          !
   !==============================================================!
@@ -107,6 +154,32 @@ module module_spherical_model
      procedure :: N =>  N_elastic_PREM
   end type elastic_PREM
 
+  interface elastic_PREM
+     procedure :: set_elastic_PREM
+  end interface elastic_PREM
+
+  
+  
+  type, extends(spherical_maxwell_model) :: maxwell_PREM
+     real(dp) :: eta_lithosphere
+     real(dp) :: eta_upper_mantle
+     real(dp) :: eta_lower_mantle
+   contains
+     procedure :: rho =>  rho_maxwell_PREM
+     procedure :: A =>  A_maxwell_PREM
+     procedure :: C =>  C_maxwell_PREM
+     procedure :: F =>  F_maxwell_PREM
+     procedure :: L =>  L_maxwell_PREM
+     procedure :: N =>  N_maxwell_PREM
+     procedure :: eta => eta_maxwell_PREM
+  end type maxwell_PREM
+
+  interface maxwell_PREM
+     procedure :: set_maxwell_PREM
+  end interface maxwell_PREM
+
+  
+  
 
   real(dp), dimension(2,13), parameter :: r_PREM = reshape((/   0.0e3_dp, 1221.5e3_dp, &
                                                              1221.5e3_dp, 3480.0e3_dp, & 
@@ -421,10 +494,59 @@ contains
 
 
 
+  subroutine write_spherical_maxwell_model(self,nknot,model_name,isotropic)
+    class(spherical_maxwell_model), intent(in) :: self
+    integer(i4b), intent(in) :: nknot
+    character(len=*), intent(in) :: model_name
+    logical, intent(in), optional :: isotropic
+    logical :: iso
+    integer(i4b) :: ilayer,nloc,iloc,io
+    real(dp) :: r1,r2,r,dr,eta
+    if(present(isotropic)) then
+       iso = isotropic
+    else
+       iso = .false.
+    end if
+    open(newunit = io,file=trim(model_name))
+    write(io,*) iso
+    do ilayer = 1,self%nlayers
+       r1 = self%layer_radius(1,ilayer)
+       r2 = self%layer_radius(2,ilayer)
+       nloc = max(int(nknot*(r2-r1)/self%rsurf),2)
+       dr = (r2-r1)/(nloc-1)
+       do iloc = 1,nloc
+          r = r1 + (iloc-1)*dr
+          eta = self%eta(ilayer,r)*viscosity_norm
+          if(eta > 0.0_dp) eta = log10(eta)
+          if(iso) then             
+             write(io,'(5e20.8)') r*length_norm,            &
+                         self%rho(ilayer,r)*density_norm,   &
+                         self%kappa(ilayer,r)*modulus_norm, &
+                         self%mu(ilayer,r)*modulus_norm,    &
+                         eta
+          else
+             write(io,'(8e20.8)') r*length_norm,            &
+                         self%rho(ilayer,r)*density_norm,   &
+                         self%A(ilayer,r)*modulus_norm,     &
+                         self%C(ilayer,r)*modulus_norm,     &
+                         self%F(ilayer,r)*modulus_norm,     &
+                         self%L(ilayer,r)*modulus_norm,     &
+                         self%N(ilayer,r)*modulus_norm,     &
+                         eta
+          end if
+       end do       
+    end do
+    close(io)    
+    return
+  end subroutine write_spherical_maxwell_model
+
+
+
   !===========================================================================!
-  !                         procedures for deck models                        !
+  !                     procedures for elastic deck models                    !
   !===========================================================================!
 
+  
   function set_elastic_deck_model(model_file) result(model)
     use module_error
     character(len=*), intent(in) :: model_file
@@ -614,11 +736,227 @@ contains
   end function N_elastic_deck_model
 
 
+
+  !===========================================================================!
+  !                     procedures for maxwell deck models                    !
+  !===========================================================================!
+
+  function set_maxwell_deck_model(model_file) result(model)
+    use module_error
+    character(len=*), intent(in) :: model_file
+    type(maxwell_deck_model) :: model
+    logical :: ltmp,iso,fluid
+    integer(i4b) :: io,nknot,ios,i,nlayers,nregions,i1,i2,ilayer,iregion
+    real(dp), dimension(:), allocatable :: r,rho,A,C,F,L,N,eta
+    
+    ! check the model file exists
+    inquire(file = trim(model_file),exist = ltmp)
+    call error(.not.ltmp,'set_maxwell_deck_model','model file does not exist')
+    
+    ! open the file and work out the format
+    open(newunit = io,file = trim(model_file))
+    read(io,*) iso
+    nknot = 0
+    do
+       read(io,*,iostat = ios)
+       if(ios /= 0) exit
+       nknot = nknot + 1
+    end do
+    rewind(io)
+    read(io,*) iso
+    
+    ! read in the values and non-dimensionalise
+    allocate(r(nknot),rho(nknot),A(nknot),C(nknot), &
+             F(nknot),L(nknot),N(nknot),eta(nknot))
+    do i = 1,nknot
+       if(iso) then
+          read(io,*) r(i),rho(i),A(i),L(i),eta(i)
+          A(i) = A(i) + 4.0_dp*L(i)/3.0_dp
+          C(i) = A(i)
+          N(i) = L(i)
+          F(i) = A(i)-2.0_dp*L(i)
+       else
+          read(io,*) r(i),rho(i),A(i),C(i),F(i),L(i),N(i),eta(i)
+       end if
+       r(i)   = r(i)/length_norm
+       rho(i) = rho(i)/density_norm
+       A(i)   = A(i)/modulus_norm
+       C(i)   = C(i)/modulus_norm
+       F(i)   = F(i)/modulus_norm
+       L(i)   = L(i)/modulus_norm
+       N(i)   = N(i)/modulus_norm
+       if(eta(i) > 0.0_dp) then
+          eta(i) = (10**eta(i))/viscosity_norm
+       end if
+    end do
+    close(io)
+
+    
+    ! work out the number of layers
+    model%nlayers = 1
+    do i = 1,nknot-1
+       if(r(i+1) == r(i)) model%nlayers = model%nlayers + 1       
+    end do
+
+    ! build the cubic splines
+    allocate(model%rho_cubic(model%nlayers))
+    allocate(model%A_cubic(model%nlayers))
+    allocate(model%C_cubic(model%nlayers))
+    allocate(model%F_cubic(model%nlayers))
+    allocate(model%L_cubic(model%nlayers))
+    allocate(model%N_cubic(model%nlayers))
+    allocate(model%eta_cubic(model%nlayers))
+    allocate(model%layer_radius(2,model%nlayers))
+    allocate(model%layer_fluid(model%nlayers))
+    allocate(model%layer_viscous(model%nlayers))
+    model%layer_fluid(:) = .false.
+    model%layer_viscous(:) = .true.
+    i1 = 1
+    ilayer = 0
+    do i = 1,nknot-1
+       if(r(i+1) == r(i)) then
+          ilayer = ilayer+1
+          i2 = i
+          model%layer_radius(1,ilayer) = r(i1)
+          model%layer_radius(2,ilayer) = r(i2)
+          call model%rho_cubic(ilayer)%set(r(i1:i2),rho(i1:i2))
+          call model%A_cubic(ilayer)%set(r(i1:i2),A(i1:i2))
+          call model%C_cubic(ilayer)%set(r(i1:i2),C(i1:i2))
+          call model%F_cubic(ilayer)%set(r(i1:i2),F(i1:i2))
+          call model%L_cubic(ilayer)%set(r(i1:i2),L(i1:i2))
+          call model%N_cubic(ilayer)%set(r(i1:i2),N(i1:i2))
+          call model%eta_cubic(ilayer)%set(r(i1:i2),eta(i1:i2))
+          if(all(L(i1:i2) == 0.0_dp)) model%layer_fluid(ilayer) = .true.
+          if(all(eta(i1:i2) == 0.0_dp)) model%layer_viscous(ilayer) = .false.
+          i1 = i+1
+       end if
+    end do
+    ilayer = ilayer + 1 
+    i2 = nknot
+    model%layer_radius(1,ilayer) = r(i1)
+    model%layer_radius(2,ilayer) = r(i2)
+    call model%rho_cubic(ilayer)%set(r(i1:i2),rho(i1:i2))
+    call model%A_cubic(ilayer)%set(r(i1:i2),A(i1:i2))
+    call model%C_cubic(ilayer)%set(r(i1:i2),C(i1:i2))
+    call model%F_cubic(ilayer)%set(r(i1:i2),F(i1:i2))
+    call model%L_cubic(ilayer)%set(r(i1:i2),L(i1:i2))
+    call model%N_cubic(ilayer)%set(r(i1:i2),N(i1:i2))
+    call model%eta_cubic(ilayer)%set(r(i1:i2),eta(i1:i2))
+    if(all(L(i1:i2) == 0.0_dp)) model%layer_fluid(ilayer) = .true.
+    if(all(eta(i1:i2) == 0.0_dp)) model%layer_viscous(ilayer) = .false.
+
+    
+    ! work out the number of regions
+    model%nregions = 1
+    do ilayer = 1,model%nlayers-1
+       if(model%layer_fluid(ilayer) .neqv. model%layer_fluid(ilayer+1)) model%nregions = model%nregions + 1
+    end do
+
+    ! set the region indices etc
+    allocate(model%region_index(2,model%nregions))
+    allocate(model%region_radius(2,model%nregions))
+    allocate(model%region_fluid(model%nregions))
+    allocate(model%region_viscous(model%nregions))       
+    iregion = 1
+    model%region_index(1,iregion) = 1
+    do ilayer = 1,model%nlayers-1
+       if(model%layer_fluid(ilayer) .neqv. model%layer_fluid(ilayer+1)) then
+          model%region_index(2,iregion) = ilayer
+          model%region_fluid(iregion) = model%layer_fluid(ilayer)
+          model%region_viscous(iregion) = model%layer_viscous(ilayer)
+          iregion = iregion + 1
+          model%region_index(1,iregion) = ilayer+1
+       end if
+    end do
+    if(model%layer_fluid(model%nlayers)) model%region_fluid(model%nregions) = .true.
+    model%region_index(2,iregion) = model%nlayers
+    do iregion = 1,model%nregions
+       model%region_radius(1,iregion) = model%layer_radius(1,model%region_index(1,iregion))
+       model%region_radius(2,iregion) = model%layer_radius(2,model%region_index(2,iregion))
+    end do
+
+    
+    ! finalise the set up
+    model%rsurf = model%layer_radius(2,model%nlayers)
+    model%allocated = .true.
+    
+    return
+  end function set_maxwell_deck_model
+
+  function rho_maxwell_deck_model(self,i,r) result(rho)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: rho
+    rho = self%rho_cubic(i)%val(r)
+    return
+  end function rho_maxwell_deck_model
+
+
+  function A_maxwell_deck_model(self,i,r) result(A)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: A
+    A = self%A_cubic(i)%val(r)
+    return
+  end function A_maxwell_deck_model
+
+
+  function C_maxwell_deck_model(self,i,r) result(C)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: C
+    C = self%C_cubic(i)%val(r)
+    return
+  end function C_maxwell_deck_model
+
+
+  function F_maxwell_deck_model(self,i,r) result(F)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: F
+    F = self%F_cubic(i)%val(r)
+    return
+  end function F_maxwell_deck_model
+
+
+  function L_maxwell_deck_model(self,i,r) result(L)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: L
+    L = self%L_cubic(i)%val(r)
+    return
+  end function L_maxwell_deck_model
+
+  
+  function N_maxwell_deck_model(self,i,r) result(N)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: N
+    N = self%N_cubic(i)%val(r)
+    return
+  end function N_maxwell_deck_model
+  
+  
+  function eta_maxwell_deck_model(self,i,r) result(eta)
+    class(maxwell_deck_model), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: eta
+    eta = self%eta_cubic(i)%val(r)
+    return
+  end function eta_maxwell_deck_model
   
   
   !===========================================================================!
   !                              procedures for PREM                          !
   !===========================================================================!
+
 
   
   function set_elastic_PREM(ocean) result(model)
@@ -735,7 +1073,136 @@ contains
     N = get_rho_PREM(i,r)*get_vsh_PREM(i,r)**2
     return
   end function N_elastic_PREM
+
+
+  function set_maxwell_PREM(eta_lithosphere,eta_upper_mantle,eta_lower_mantle) result(model)
+    type(maxwell_PREM) :: model
+    real(dp), intent(in) :: eta_lithosphere
+    real(dp), intent(in) :: eta_upper_mantle
+    real(dp), intent(in) :: eta_lower_mantle
+    model%eta_lithosphere  = (10**eta_lithosphere)/viscosity_norm
+    model%eta_upper_mantle = (10**eta_upper_mantle)/viscosity_norm
+    model%eta_lower_mantle = (10**eta_lower_mantle)/viscosity_norm
+    model%nregions = 3
+    model%nlayers = 12
+    allocate(model%region_fluid(model%nregions))
+    allocate(model%region_viscous(model%nregions))
+    allocate(model%region_index(2,model%nregions))
+    allocate(model%region_radius(2,model%nregions))
+    allocate(model%layer_fluid(model%nlayers))
+    allocate(model%layer_viscous(model%nregions))
+    allocate(model%layer_radius(2,model%nlayers))
+    ! inner core
+    model%region_index(1,1) = 1
+    model%region_index(2,1) = 1
+    model%region_radius(1,1) = r_PREM(1,1)
+    model%region_radius(2,1) = r_PREM(1,1)
+    model%region_fluid(1) = .false.
+    model%layer_fluid(1) = .false.
+    model%region_viscous(1) = .false.
+    model%layer_viscous(1) = .false.
+    ! outer core
+    model%region_index(1,2) = 2
+    model%region_index(2,2) = 2
+    model%region_radius(1,2) = r_PREM(1,2)
+    model%region_radius(2,2) = r_PREM(1,2)
+    model%region_fluid(2) = .true.
+    model%layer_fluid(2) = .true.
+    model%region_viscous(2) = .false.
+    model%layer_viscous(2) = .false.
+    ! mantle
+    model%region_index(1,3) = 3
+    model%region_index(2,3) = 12
+    model%region_radius(1,3) = r_PREM(1,3)
+    model%region_radius(2,3) = r_PREM(1,12)
+    model%region_fluid(3) = .false.
+    model%layer_fluid(3:12) = .false.
+    model%region_viscous(3) = .true.
+    model%layer_viscous(3:) = .true.
+    model%layer_radius(:,1:model%nlayers) = r_PREM(:,1:model%nlayers)    
+    model%rsurf = model%layer_radius(2,model%nlayers)
+    model%allocated = .true.
+    return
+  end function set_maxwell_PREM
+    
+  function rho_maxwell_PREM(self,i,r) result(rho)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: rho
+    rho = get_rho_PREM(i,r)
+    return
+  end function rho_maxwell_PREM
+
+
+  function A_maxwell_PREM(self,i,r) result(A)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: A
+    A = get_rho_PREM(i,r)*get_vph_PREM(i,r)**2
+    return
+  end function A_maxwell_PREM
+
+
+  function C_maxwell_PREM(self,i,r) result(C)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: C
+    C = get_rho_PREM(i,r)*get_vpv_PREM(i,r)**2
+    return
+  end function C_maxwell_PREM
+
+
+  function F_maxwell_PREM(self,i,r) result(F)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: F
+    F = get_eta_PREM(i,r)*(self%A(i,r) - 2.0_dp*self%L(i,r))
+    return
+  end function F_maxwell_PREM
+
   
+  function L_maxwell_PREM(self,i,r) result(L)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: L
+    L = get_rho_PREM(i,r)*get_vsv_PREM(i,r)**2
+    return
+  end function L_maxwell_PREM
+
+  
+  function N_maxwell_PREM(self,i,r) result(N)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: N
+    N = get_rho_PREM(i,r)*get_vsh_PREM(i,r)**2
+    return
+  end function N_maxwell_PREM
+
+  
+
+  function eta_maxwell_PREM(self,i,r) result(eta)
+    class(maxwell_PREM), intent(in) :: self
+    integer(i4b), intent(in) :: i
+    real(dp), intent(in) :: r
+    real(dp) :: eta
+    if(i >= 3 .and. i <= 7) then
+       eta = self%eta_lower_mantle
+    else if(i >= 7 .and. i <= 10) then
+       eta = self%eta_upper_mantle
+    else if(i >= 10) then
+       eta = self%eta_lithosphere
+    else
+       eta = 0.0_dp
+    end if
+    return
+  end function eta_maxwell_PREM
+
 
 
   function get_rho_PREM(i,r) result(rho)

@@ -9,9 +9,11 @@ program test_spherical_model
   class(spherical_elastic_model), allocatable :: model
   class(spherical_elastic_model), allocatable :: deck_model
 
-  model =  set_elastic_PREM()
+  class(spherical_maxwell_model), allocatable :: maxwell_model
+  
+  model = elastic_PREM()
   call model%write(200,'prem.200')!,isotropic = .true.)
-  deck_model = set_elastic_deck_model('prem.200') 
+  deck_model = elastic_deck_model('prem.200') 
 
 
   open(99,file='test_spherical_model.out')
@@ -25,8 +27,15 @@ program test_spherical_model
      end do
   end do
   close(99)
-  
 
+  
+  maxwell_model = maxwell_PREM(25.0_dp,21.0_dp,22.0_dp)
+  call maxwell_model%write(200,'prem_maxwell.out')
+  
+  deallocate(maxwell_model)
+  maxwell_model = maxwell_deck_model('prem_maxwell.out')
+  call maxwell_model%write(200,'deck_maxwell.out')
+  
   
 end program test_spherical_model
 
