@@ -3,23 +3,9 @@ module module_util
   use module_constants
   use module_error
 
-
-  type list_data
-     integer(i4b) :: a
-   contains
-     procedure :: print_data
-  end type list_data
-
-  type, extends(list_data) :: extended_list_data
-     real(dp) :: b
-  end type extended_list_data
-
-
-  
-  type linked_list
-     class(list_data), allocatable :: data
-     type(linked_list), pointer :: next
-  end type linked_list
+  interface count_columns
+     procedure :: count_columns,count_columns_opened
+  end interface count_columns
 
   
 contains
@@ -111,131 +97,73 @@ contains
   end function hunt_list
 
 
-  
-  subroutine print_data(data)
-    class(list_data), intent(in) :: data
-    select type(data)
-    type is(list_data)
-       print *, data%a
-    type is(extended_list_data)
-       print *, data%a,data%b       
-    end select
+  function count_columns(file) result(ncol)
+    implicit none
+    character(len = *), intent(in) :: file
+    integer(i4b) :: ncol
 
+    character(len=:), allocatable :: line
+    integer(i4b) :: io,ios
+    real(dp), dimension(:), allocatable :: tmp
+    open(newunit = io,file = trim(file))
+    line = readline(io)
+    allocate(tmp(len(line)))
+    close(io)
+    ncol = 0
+    do
+       read(line,*,iostat = ios) tmp(1:ncol)
+       if(ios /= 0) exit
+       ncol = ncol + 1
+    end do 
+    ncol = ncol-1    
     return
-  end subroutine print_data
+  end function count_columns
 
-  subroutine list_create( list, data )
-    type(LINKED_LIST), pointer  :: list
-    type(LIST_DATA), intent(in) :: data
-    allocate( list )
-    list%next => null()
-    list%data =  data
-  end subroutine list_create
+  function count_columns_opened(io) result(ncol)
+    implicit none
+    integer(i4b), intent(in) :: io
+    integer(i4b) :: ncol
 
-
-  subroutine list_destroy( list )
-    type(LINKED_LIST), pointer  :: list
-    type(LINKED_LIST), pointer  :: current
-    type(LINKED_LIST), pointer  :: next
-
-    current => list
-    do while ( associated(current%next) )
-       next => current%next
-        deallocate( current )
-        current => next
-    end do
-  end subroutine list_destroy
-
-
-  integer function list_count( list )
-    type(LINKED_LIST), pointer  :: list
-    type(LINKED_LIST), pointer  :: current
-    type(LINKED_LIST), pointer  :: next
+    logical :: ok
+    character(len=:), allocatable :: line
+    integer(i4b) :: ios
+    real(dp), dimension(:), allocatable :: tmp
+    line = readline(io)
+    allocate(tmp(len(line)))
+    backspace(io)
+    ncol = 0
+    do
+       read(line,*,iostat = ios) tmp(1:ncol)
+       if(ios /= 0) exit
+       ncol = ncol + 1
+    end do 
+    ncol = ncol-1
     
-    if ( associated(list) ) then
-       list_count = 1
-       current => list
-       do while ( associated(current%next) )
-          current => current%next
-          list_count = list_count + 1
-       end do
-    else
-       list_count = 0
-    end if
-  end function list_count
-
-  function list_next( elem ) result(next)
-    type(LINKED_LIST), pointer :: elem
-    type(LINKED_LIST), pointer :: next
-    next => elem%next
-  end function list_next
-
-  subroutine list_insert( elem, data )
-    type(LINKED_LIST), pointer  :: elem
-    type(LIST_DATA), intent(in) :: data
-    type(LINKED_LIST), pointer :: next
-    allocate(next)
-    next%next => elem%next
-    elem%next => next
-    next%data =  data
-  end subroutine list_insert
-
-  subroutine list_insert_head( list, data )
-    type(LINKED_LIST), pointer  :: list
-    type(LIST_DATA), intent(in) :: data
-    type(LINKED_LIST), pointer :: elem
-    allocate(elem)
-    elem%data =  data
-    elem%next => list
-    list      => elem
-  end subroutine list_insert_head
-
-
+    return
+  end function count_columns_opened
   
-  subroutine list_insert_end( list, data )
-    type(LINKED_LIST), pointer  :: list
-    class(LIST_DATA), intent(in) :: data
-    type(LINKED_LIST), pointer :: elem,current
-    allocate(elem)
-    elem%data =  data
-    elem%next => null()
-    current => list
-    do while(associated(current%next))
-       current => current%next
+  function readline(aunit) result(line)
+    implicit none
+    integer, intent(IN) :: aunit
+    character(LEN=:), allocatable :: line
+    integer, parameter :: line_buf_len= 1024*4
+    character(LEN=line_buf_len) :: InS
+    logical :: OK, set
+    integer status, size    
+    OK = .false.
+    set = .true.
+    do
+       read (aunit,'(a)',advance='NO',iostat=status, size=size) InS
+       OK = .not. IS_IOSTAT_END(status)
+       if (.not. OK) return
+       if (set) then
+          line = InS(1:size)
+          set=.false.
+       else
+          line = line // InS(1:size)
+       end if
+       if (IS_IOSTAT_EOR(status)) exit
     end do
-    current%next => elem
-  end subroutine list_insert_end
+  end function readline
 
-
-  subroutine list_delete_element( list, elem )
-    type(LINKED_LIST), pointer  :: list
-    type(LINKED_LIST), pointer  :: elem
-
-    type(LINKED_LIST), pointer  :: current
-    type(LINKED_LIST), pointer  :: prev
-
-    if ( associated(list,elem) ) then
-        list => elem%next
-        deallocate( elem )
-    else
-        current => list
-        prev    => list
-        do while ( associated(current) )
-            if ( associated(current,elem) ) then
-                prev%next => current%next
-                deallocate( current ) ! Is also "elem"
-                exit
-            endif
-            prev    => current
-            current => current%next
-        enddo
-     endif
-     !    allocate(next)
-!
-     !    next%next => elem%next
-     !    elem%next => next
-     !    next%data =  data
-   end subroutine list_delete_element
-  
-  
 end module module_util

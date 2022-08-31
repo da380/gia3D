@@ -66,5 +66,8 @@ module module_constants
   real(qp), parameter :: rad2deg_qp = 57.295779513082320876798154814105170332405472466564321549160243861_qp
 
 
-
+  ! conversions between seconds and years
+  real(dp), parameter :: yr2sec = 60.0_dp*60.0_dp*24.0_dp*365.25_dp
+  real(dp), parameter :: sec2yr = 1.0_dp/yr2sec  
+  
 end module module_constants
