@@ -2,7 +2,7 @@ module module_spherical_model
 
   use module_constants  
   use module_physical_constants
-  use module_util, only : poly_eval, count_columns
+  use module_util, only : poly, count_columns
   use module_interp
   implicit none
 
@@ -758,7 +758,7 @@ contains
     class(PREM_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: rho
-    rho = poly_eval(4,rho_coef_PREM(:,self%i),r/r_PREM(2,13))
+    rho = poly(4,rho_coef_PREM(:,self%i),r/r_PREM(2,13))
     return
   end function rho_PREM_solid_elastic_layer
 
@@ -766,7 +766,7 @@ contains
     class(PREM_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: A
-    A = self%rho(r)*poly_eval(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    A = self%rho(r)*poly(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function A_PREM_solid_elastic_layer
   
@@ -774,7 +774,7 @@ contains
     class(PREM_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: C
-    C = self%rho(r)*poly_eval(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    C = self%rho(r)*poly(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function C_PREM_solid_elastic_layer
 
@@ -782,7 +782,7 @@ contains
     class(PREM_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: F
-    F = poly_eval(4,eta_coef_PREM(:,self%i),r/r_PREM(2,13))*(self%A(r) - 2.0_dp*self%L(r))
+    F = poly(4,eta_coef_PREM(:,self%i),r/r_PREM(2,13))*(self%A(r) - 2.0_dp*self%L(r))
     return
   end function F_PREM_solid_elastic_layer
 
@@ -790,7 +790,7 @@ contains
     class(PREM_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: L
-    L = self%rho(r)*poly_eval(4,vsv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    L = self%rho(r)*poly(4,vsv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function L_PREM_solid_elastic_layer
 
@@ -798,7 +798,7 @@ contains
     class(PREM_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: N
-    N = self%rho(r)*poly_eval(4,vsh_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    N = self%rho(r)*poly(4,vsh_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function N_PREM_solid_elastic_layer
 
@@ -807,7 +807,7 @@ contains
     class(PREM_fluid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: rho
-    rho = poly_eval(4,rho_coef_PREM(:,self%i),r/r_PREM(2,13))
+    rho = poly(4,rho_coef_PREM(:,self%i),r/r_PREM(2,13))
     return
   end function rho_PREM_fluid_elastic_layer
 
@@ -816,7 +816,7 @@ contains
     class(PREM_fluid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: kappa
-    kappa = self%rho(r)*poly_eval(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    kappa = self%rho(r)*poly(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function kappa_PREM_fluid_elastic_layer
 
@@ -933,7 +933,7 @@ contains
     class(PREM_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: rho
-    rho = poly_eval(4,rho_coef_PREM(:,self%i),r/r_PREM(2,13))
+    rho = poly(4,rho_coef_PREM(:,self%i),r/r_PREM(2,13))
     return
   end function rho_PREM_maxwell_layer
 
@@ -941,7 +941,7 @@ contains
     class(PREM_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: A
-    A = self%rho(r)*poly_eval(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    A = self%rho(r)*poly(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function A_PREM_maxwell_layer
   
@@ -949,7 +949,7 @@ contains
     class(PREM_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: C
-    C = self%rho(r)*poly_eval(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    C = self%rho(r)*poly(4,vpv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function C_PREM_maxwell_layer
 
@@ -957,7 +957,7 @@ contains
     class(PREM_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: F
-    F = poly_eval(4,eta_coef_PREM(:,self%i),r/r_PREM(2,13))*(self%A(r) - 2.0_dp*self%L(r))
+    F = poly(4,eta_coef_PREM(:,self%i),r/r_PREM(2,13))*(self%A(r) - 2.0_dp*self%L(r))
     return
   end function F_PREM_maxwell_layer
 
@@ -965,7 +965,7 @@ contains
     class(PREM_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: L
-    L = self%rho(r)*poly_eval(4,vsv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    L = self%rho(r)*poly(4,vsv_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function L_PREM_maxwell_layer
 
@@ -973,7 +973,7 @@ contains
     class(PREM_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: N
-    N = self%rho(r)*poly_eval(4,vsh_coef_PREM(:,self%i),r/r_PREM(2,13))**2
+    N = self%rho(r)*poly(4,vsh_coef_PREM(:,self%i),r/r_PREM(2,13))**2
     return
   end function N_PREM_maxwell_layer
 
@@ -1177,7 +1177,7 @@ contains
     class(DECK_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: rho
-    rho = self%rho_cubic%val(r)
+    rho = self%rho_cubic%f(r)
     return
   end function rho_DECK_solid_elastic_layer
 
@@ -1185,7 +1185,7 @@ contains
     class(DECK_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: A,vpv    
-    A = self%A_cubic%val(r)
+    A = self%A_cubic%f(r)
     return
   end function A_DECK_solid_elastic_layer
   
@@ -1193,7 +1193,7 @@ contains
     class(DECK_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: C,rho,vsv
-    C = self%C_cubic%val(r)
+    C = self%C_cubic%f(r)
     return
   end function C_DECK_solid_elastic_layer
 
@@ -1201,7 +1201,7 @@ contains
     class(DECK_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: F
-    F = self%F_cubic%val(r)
+    F = self%F_cubic%f(r)
     return
   end function F_DECK_solid_elastic_layer
 
@@ -1209,7 +1209,7 @@ contains
     class(DECK_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: L
-    L = self%L_cubic%val(r)
+    L = self%L_cubic%f(r)
     return
   end function L_DECK_solid_elastic_layer
 
@@ -1217,7 +1217,7 @@ contains
     class(DECK_solid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: N
-    N = self%N_cubic%val(r)
+    N = self%N_cubic%f(r)
     return
   end function N_DECK_solid_elastic_layer
 
@@ -1226,7 +1226,7 @@ contains
     class(DECK_fluid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: rho
-    rho = self%rho_cubic%val(r)
+    rho = self%rho_cubic%f(r)
     return
   end function rho_DECK_fluid_elastic_layer
 
@@ -1234,7 +1234,7 @@ contains
     class(DECK_fluid_elastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: kappa,vpv    
-    kappa = self%kappa_cubic%val(r)
+    kappa = self%kappa_cubic%f(r)
     return
   end function kappa_DECK_fluid_elastic_layer
 
@@ -1459,7 +1459,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: rho
-    rho = self%rho_cubic%val(r)
+    rho = self%rho_cubic%f(r)
     return
   end function rho_DECK_maxwell_layer
 
@@ -1467,7 +1467,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: A,vpv    
-    A = self%A_cubic%val(r)
+    A = self%A_cubic%f(r)
     return
   end function A_DECK_maxwell_layer
   
@@ -1475,7 +1475,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: C,rho,vsv
-    C = self%C_cubic%val(r)
+    C = self%C_cubic%f(r)
     return
   end function C_DECK_maxwell_layer
 
@@ -1483,7 +1483,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: F
-    F = self%F_cubic%val(r)
+    F = self%F_cubic%f(r)
     return
   end function F_DECK_maxwell_layer
 
@@ -1491,7 +1491,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: L
-    L = self%L_cubic%val(r)
+    L = self%L_cubic%f(r)
     return
   end function L_DECK_maxwell_layer
 
@@ -1499,7 +1499,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: N
-    N = self%N_cubic%val(r)
+    N = self%N_cubic%f(r)
     return
   end function N_DECK_maxwell_layer
 
@@ -1507,7 +1507,7 @@ contains
     class(DECK_maxwell_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: eta
-    eta = self%eta_cubic%val(r)
+    eta = self%eta_cubic%f(r)
     return
   end function eta_DECK_maxwell_layer
 

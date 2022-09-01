@@ -10,7 +10,7 @@ module module_util
   
 contains
 
-  function poly_eval(n,coef,x) result(y)
+  function poly(n,coef,x) result(y)
     real(dp), dimension(n), intent(in) :: coef
     real(dp), intent(in) :: X
     real(dp) :: y
@@ -19,7 +19,7 @@ contains
     do i = n-1,1,-1
        y = coef(i) + x*y
     end do
-  end function poly_eval
+  end function poly
 
 
   function bisect_list(xx,x) result(il)

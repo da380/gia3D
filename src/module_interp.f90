@@ -12,12 +12,14 @@ module module_interp
      integer(i4b) :: isave = 0
      real(dp), dimension(:), allocatable :: xx
      real(dp), dimension(:), allocatable :: yy
-     real(dp) :: xsave,dxsave     
+     real(dp) :: xsave,dxsave
+     real(dp) :: yp
    contains
      procedure :: set    => set_interp_1D
      procedure :: delete => delete_interp_1D
      procedure :: find   => find_interp_1D
-     procedure :: val    => value_interp_1D
+     procedure :: f    => value_interp_1D
+     procedure :: fp => derivative_interp_1D
   end type interp_1D
   private :: set_interp_1D,find_interp_1D, &
              value_interp_1D,delete_interp_1D
@@ -26,11 +28,13 @@ module module_interp
   type, extends(interp_1D) :: interp_1D_cubic
      private
      real(dp), dimension(:), allocatable :: yy2
-     real(dp), public :: yp,ypp
+     real(dp) :: ypp
    contains
      procedure :: set => set_interp_1D_cubic
      procedure :: delete => delete_interp_1D_cubic
-     procedure :: val => value_interp_1D_cubic
+     procedure :: f => value_interp_1D_cubic
+     procedure :: fp => derivative_interp_1D_cubic
+     procedure :: fpp => derivative_interp_1D_cubic
   end type interp_1D_cubic
  private :: set_interp_1D_cubic,value_interp_1D_cubic, &
              delete_interp_1D_cubic
@@ -114,7 +118,7 @@ contains
     return
   end function find_interp_1D
 
-  real(dp) function value_interp_1D(self,x)
+  function value_interp_1D(self,x) result(y)
     implicit none
     class(interp_1D) :: self
     real(dp), intent(in) :: x
@@ -129,10 +133,26 @@ contains
     y1 = self%yy(i)
     y2 = self%yy(i+1)
 
-    value_interp_1D = y1 + (y2-y1)*(x-x1)/(x2-x1)
+    self%yp = (y2-y1)/(x2-x1)
+    y = y1 + self%yp*(x-x1)
     
     return
   end function value_interp_1D
+
+
+  function derivative_interp_1D(self,x) result(yp)
+    implicit none
+    class(interp_1D) :: self
+    real(dp), intent(in) :: x
+
+    integer(i4b) :: i
+    real(dp) :: y,yp
+    
+    if(x /= self%xsave) y = self%f(x)
+    yp = self%yp
+    
+    return
+  end function derivative_interp_1D
 
 
   subroutine delete_interp_1D(self)
@@ -212,7 +232,7 @@ contains
     
 
     
-  real(dp) function value_interp_1D_cubic(self,x)
+  function value_interp_1D_cubic(self,x) result(y)
 
     ! evaluates the cubic spline at a given location.
     ! Also computes and stores first and second derivatives, 
@@ -222,7 +242,7 @@ contains
     real(dp), intent(in) :: x
 
     integer(i4b) :: i1,i2
-    real(dp) :: a,b,h,x1,x2,y1,y2,y21,y22
+    real(dp) :: a,b,h,x1,x2,y1,y2,y21,y22,y
 
     ! get the indices and points
     i1 = self%find(x)
@@ -240,8 +260,7 @@ contains
     b   = (x-x1)/h
 
     ! compute the function  
-    value_interp_1D_cubic = a*y1 + b*y2 + ((a*a*a-a)*y21               & 
-                                        +  (b*b*b-b)*y22)*(h*h)/6.0_dp
+    y = a*y1 + b*y2 + ((a*a*a-a)*y21 +  (b*b*b-b)*y22)*(h*h)/6.0_dp
 
     ! compute the first and second derivatives and store values   
     self%yp  = (y2-y1)/h  - (3.0_dp*a*a-1)*h*y21/6.0_dp  &
@@ -252,6 +271,41 @@ contains
     return
   endfunction value_interp_1D_cubic
 
+
+  function derivative_interp_1D_cubic(self,x) result(yp)
+
+    ! evaluates the cubic spline at a given location.
+    ! Also computes and stores first and second derivatives, 
+    ! with the results stored as type data  
+    implicit none
+    class(interp_1D_cubic) :: self
+    real(dp), intent(in) :: x
+    real(dp) :: y,yp
+
+    if(x /= self%xsave) y = self%f(x)
+    yp = self%yp
+
+    return
+  end function derivative_interp_1D_cubic
+
+
+  function derivative2_interp_1D_cubic(self,x) result(ypp)
+
+    ! evaluates the cubic spline at a given location.
+    ! Also computes and stores first and second derivatives, 
+    ! with the results stored as type data  
+    implicit none
+    class(interp_1D_cubic) :: self
+    real(dp), intent(in) :: x
+    real(dp) :: y,ypp
+
+    if(x /= self%xsave) y = self%f(x)
+    ypp = self%ypp
+
+    return
+  end function derivative2_interp_1D_cubic
+  
+  
   subroutine delete_interp_1D_cubic(self)
     implicit none
     class(interp_1D_cubic) :: self
