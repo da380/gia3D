@@ -49,7 +49,9 @@ MOD_SRCS = module_constants.f90            \
 	   module_special_functions.f90    \
 	   module_quadrature.f90           \
            module_spherical_harmonics.f90  \
-           module_spherical_model.f90      
+           module_spherical_model.f90      \
+	   module_PREM.f90                 \
+	   module_DECK.f90
 
 
 ###########################################################
