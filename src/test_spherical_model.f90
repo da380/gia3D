@@ -25,10 +25,10 @@ program test_spherical_model
   tau_LM =  10000.0_dp*yr2sec/time_norm
   tau_UM =   1000.0_dp*yr2sec/time_norm
   tau_C  = 5000000.0_dp*yr2sec/time_norm
-  model = maxwell_PREM(tau_LM,tau_UM)
+  model = maxwell_PREM(tau_LM,tau_UM,tau_C)
   call model%write_maxwell('prem_maxwell.out',200)
-
   model = maxwell_DECK('prem_maxwell.out')
+  call model%write_maxwell('prem_maxwell2.out',200)
   
 end program test_spherical_model
 

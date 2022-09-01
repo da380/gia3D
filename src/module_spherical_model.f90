@@ -194,6 +194,7 @@ module module_spherical_model
      procedure :: eta => eta_DECK_maxwell_layer     
   end type DECK_maxwell_layer
 
+
   
   !==============================================================!
   !                          PREM data                           !
@@ -821,16 +822,16 @@ contains
 
 
 
-  function maxwell_PREM(eta_LM,eta_UM,eta_C) result(model)
-    real(dp), intent(in) :: eta_LM,eta_UM
-    real(dp), intent(in), optional :: eta_C
+  function maxwell_PREM(tau_LM,tau_UM,tau_C) result(model)
+    real(dp), intent(in) :: tau_LM,tau_UM
+    real(dp), intent(in), optional :: tau_C
     type(spherical_model) :: model
 
     logical :: elastic_crust
     integer(i4b) :: ilayer
 
     ! check for optional argument
-    elastic_crust = .not.present(eta_C)
+    elastic_crust = .not.present(tau_C)
     
     ! set the section structure
     model%r1 = r_PREM(1,1)
@@ -891,12 +892,12 @@ contains
             layer%r1 = r_PREM(1,layer%i)
             layer%r2 = r_PREM(2,layer%i)
             if(ilayer <= 3) then
-               layer%tau_value = eta_LM
+               layer%tau_value = tau_LM
             else
-               layer%tau_value = eta_UM
+               layer%tau_value = tau_UM
             end if
             if(.not.elastic_crust .and. ilayer > 7) then
-               layer%tau_value = eta_C
+               layer%tau_value = tau_C
             end if
          end select
        end associate
@@ -1357,12 +1358,6 @@ contains
        sind(3,isec) = 0
     end if
 
-
-    do isec = 1,model%nsections
-       print *, sind(:,isec)
-    end do
-    
-    stop
     
     ! build up the layers for each section
     do isec = 1,model%nsections
@@ -1384,8 +1379,10 @@ contains
          ! allocate the layers
          if(sind(3,isec) == 0) then
             allocate(DECK_solid_elastic_layer:: section%layer(nlayers))
-         else
+         else if(sind(3,isec) == 1) then
             allocate(DECK_fluid_elastic_layer:: section%layer(nlayers))
+         else
+            allocate(DECK_maxwell_layer:: section%layer(nlayers))
          end if
 
          ilay = 1
@@ -1409,6 +1406,14 @@ contains
                  type is(DECK_fluid_elastic_layer)                    
                     call layer%rho_cubic%set(r(i11:i22),rho(i11:i22))
                     call layer%kappa_cubic%set(r(i11:i22),vpv(i11:i22))
+                 type is(DECK_maxwell_layer)
+                    call layer%rho_cubic%set(r(i11:i22),rho(i11:i22))
+                    call layer%A_cubic%set(r(i11:i22),vph(i11:i22))
+                    call layer%C_cubic%set(r(i11:i22),vpv(i11:i22))
+                    call layer%F_cubic%set(r(i11:i22),eta(i11:i22))
+                    call layer%L_cubic%set(r(i11:i22),vsv(i11:i22))
+                    call layer%N_cubic%set(r(i11:i22),vsh(i11:i22))
+                    call layer%eta_cubic%set(r(i11:i22),visco(i11:i22))
                  end select
                  i11 = i22+1
                end associate
@@ -1431,19 +1436,23 @@ contains
            type is(DECK_fluid_elastic_layer)                    
               call layer%rho_cubic%set(r(i11:i22),rho(i11:i22))
               call layer%kappa_cubic%set(r(i11:i22),vpv(i11:i22))
+           type is(DECK_maxwell_layer)
+              call layer%rho_cubic%set(r(i11:i22),rho(i11:i22))
+              call layer%A_cubic%set(r(i11:i22),vph(i11:i22))
+              call layer%C_cubic%set(r(i11:i22),vpv(i11:i22))
+              call layer%F_cubic%set(r(i11:i22),eta(i11:i22))
+              call layer%L_cubic%set(r(i11:i22),vsv(i11:i22))
+              call layer%N_cubic%set(r(i11:i22),vsh(i11:i22))
+              call layer%eta_cubic%set(r(i11:i22),visco(i11:i22))
            end select
          end associate
          
-         
        end associate
        
-
     end do
-    
-    
+        
     return
   end function maxwell_DECK
-
 
   
   function rho_DECK_maxwell_layer(self,r) result(rho)
