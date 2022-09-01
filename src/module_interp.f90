@@ -34,7 +34,7 @@ module module_interp
      procedure :: delete => delete_interp_1D_cubic
      procedure :: f => value_interp_1D_cubic
      procedure :: fp => derivative_interp_1D_cubic
-     procedure :: fpp => derivative_interp_1D_cubic
+     procedure :: fpp => derivative2_interp_1D_cubic
   end type interp_1D_cubic
  private :: set_interp_1D_cubic,value_interp_1D_cubic, &
              delete_interp_1D_cubic
