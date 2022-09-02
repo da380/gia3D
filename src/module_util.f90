@@ -141,10 +141,11 @@ contains
     
     return
   end function count_columns_opened
+
   
-  function readline(aunit) result(line)
+  function readline(io) result(line)
     implicit none
-    integer, intent(IN) :: aunit
+    integer, intent(IN) :: io
     character(LEN=:), allocatable :: line
     integer, parameter :: line_buf_len= 1024*4
     character(LEN=line_buf_len) :: InS
@@ -153,7 +154,7 @@ contains
     OK = .false.
     set = .true.
     do
-       read (aunit,'(a)',advance='NO',iostat=status, size=size) InS
+       read (io,'(a)',advance='NO',iostat=status, size=size) InS
        OK = .not. IS_IOSTAT_END(status)
        if (.not. OK) return
        if (set) then

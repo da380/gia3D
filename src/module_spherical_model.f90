@@ -266,7 +266,7 @@ contains
 
     iso = .false.
     if(present(isotropic)) then
-       if(isotropic) iso = isotropic
+       iso = isotropic
     end if
           
     
@@ -369,7 +369,7 @@ contains
 
     iso = .false.
     if(present(isotropic)) then
-       if(isotropic) iso = isotropic
+       iso = isotropic
     end if
           
     
@@ -497,12 +497,12 @@ contains
 
     iso = .false.
     if(present(isotropic)) then
-       if(isotropic) iso = isotropic
+       iso = isotropic
     end if
 
     qiso = .true.
     if(present(qisotropic)) then
-       if(qisotropic) qiso = qisotropic
+       qiso = qisotropic
     end if
           
     
@@ -608,7 +608,8 @@ contains
 
 
                   else
-                  
+
+                     
                      write(io,'(12e18.8)') r*length_norm,     &
                                           rho*density_norm,   & 
                                           vpv*velocity_norm,  & 
@@ -643,8 +644,9 @@ contains
     class(spherical_solid_anelastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: qkappa
-    qkappa = self%qC(r) + 4.0_dp*self%qA(r) - 4.0_dp*self%qN(r) + 4.0_dp*self%qF(r)
-    qkappa = qkappa/9.0_dp
+    qkappa =   self%C(r)*self%qC(r) + 4.0_dp*self%A(r)*self%qA(r) &
+             - 4.0_dp*self%N(r)*self%qN(r) + 4.0_dp*self%F(r)*self%qF(r)
+    qkappa = qkappa/(9.0_dp*self%kappa(r))
     return
   end function qkappa_spherical_solid_anelastic_layer
 
@@ -653,8 +655,9 @@ contains
     class(spherical_solid_anelastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
     real(dp) :: qmu
-    qmu = self%qC(r) + self%qA(r) + 6.0_dp*self%qL(r) + 5.0_dp*self%qN(r) - 2.0_dp*self%qF(r)
-    qmu = qmu/15.0_dp
+    qmu =   self%C(r)*self%qC(r) + self%A(r)*self%qA(r) + 6.0_dp*self%L(r)*self%qL(r) &
+          + 5.0_dp*self%N(r)*self%qN(r) - 2.0_dp*self%F(r)*self%qF(r)
+    qmu = qmu/(15.0_dp*self%mu(r))
     return
   end function qmu_spherical_solid_anelastic_layer
   

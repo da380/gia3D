@@ -34,6 +34,9 @@ program test_spherical_model
 
   model = anelastic_PREM()
   call model%write_anelastic('prem_anelastic.200',200)
+
+  model = anelastic_DECK('prem_anelastic.200')
+  call model%write_anelastic('prem_anelastic2.200',200)
   
 end program test_spherical_model
 

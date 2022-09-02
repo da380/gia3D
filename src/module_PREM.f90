@@ -684,30 +684,39 @@ contains
   function qA_PREM_solid_anelastic_layer(self,r) result(qA)
     class(PREM_solid_anelastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
-    real(dp) :: qA,qk,qm
+    real(dp) :: qA,qk,qm,k,m,A
+    k = self%kappa(r)
+    m = self%mu(r)
+    A = self%A(r)
     qk = poly(4,qk_coef_PREM(:,self%i),r/r_PREM(2,13))
     qm = poly(4,qm_coef_PREM(:,self%i),r/r_PREM(2,13))
-    qA = qk + 4.0_dp*qm/3.0_dp
+    qA = (k*qk + 4.0_dp*m*qm/3.0_dp)/A
     return
   end function qA_PREM_solid_anelastic_layer
 
   function qC_PREM_solid_anelastic_layer(self,r) result(qC)
     class(PREM_solid_anelastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
-    real(dp) :: qC,qk,qm
+    real(dp) :: qC,qk,qm,k,m,C
+    k = self%kappa(r)
+    m = self%mu(r)
+    C = self%C(r)
     qk = poly(4,qk_coef_PREM(:,self%i),r/r_PREM(2,13))
     qm = poly(4,qm_coef_PREM(:,self%i),r/r_PREM(2,13))
-    qC = qk + 4.0_dp*qm/3.0_dp
+    qC = (k*qk + 4.0_dp*m*qm/3.0_dp)/C
     return
   end function qC_PREM_solid_anelastic_layer
 
   function qF_PREM_solid_anelastic_layer(self,r) result(qF)
     class(PREM_solid_anelastic_layer), intent(in) :: self
     real(dp), intent(in) :: r
-    real(dp) :: qF,qk,qm
+    real(dp) :: qF,qk,qm,k,m,F
+    k = self%kappa(r)
+    m = self%mu(r)
+    F = self%F(r)
     qk = poly(4,qk_coef_PREM(:,self%i),r/r_PREM(2,13))
     qm = poly(4,qm_coef_PREM(:,self%i),r/r_PREM(2,13))
-    qF = qk - 2.0_dp*qm/3.0_dp
+    qF = (k*qk - 2.0_dp*m*qm/3.0_dp)/F
     return
   end function qF_PREM_solid_anelastic_layer
 
