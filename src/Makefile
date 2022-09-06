@@ -17,7 +17,6 @@ FFTW3 = /home/david/lib/fftw-3.3.3/api
 FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3)
 
 
-
 # libraries to link to
 LIBS =  -llapack -lfftw3 -lblas
 
@@ -34,7 +33,8 @@ SRCS = test_special_functions.f90    \
        test_spherical_harmonics.f90  \
        test_wigner.f90               \
        test_spherical_model.f90      \
-       test.f90
+       test.f90                      \
+       test_mesh.f90
 
 
 ###########################################################
@@ -51,7 +51,8 @@ MOD_SRCS = module_constants.f90            \
            module_spherical_harmonics.f90  \
            module_spherical_model.f90      \
 	   module_PREM.f90                 \
-	   module_DECK.f90
+	   module_DECK.f90                 \
+           module_mesh.f90
 
 
 ###########################################################

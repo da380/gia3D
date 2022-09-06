@@ -2,6 +2,7 @@ module module_spherical_model
 
   use module_constants  
   use module_physical_constants
+  use module_error
   implicit none
 
   !========================================!

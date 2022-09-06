@@ -408,6 +408,10 @@ contains
 
     ! get the weights
     w = mu0*z(1,:)**2
+
+    ! force end points to be exact
+    x(1) = -1.0_dp
+    x(n+1) = 1.0_dp
     
     return
   end subroutine build_gauss_lobatto_quadrature

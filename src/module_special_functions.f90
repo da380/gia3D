@@ -721,5 +721,53 @@ contains
     call p%delete()    
     return
   end subroutine set_wigner_array
+
+
+  !==================================================================!
+  !                    Lagrange polynomial routines                  !
+  !==================================================================!
+
+  subroutine lagrange_polynomial(x,n,xn,h,hp)
+    real(dp), intent(in) :: x
+    integer(i4b), intent(in) :: n
+    real(dp), dimension(n), intent(in) :: xn
+    real(dp), dimension(n), intent(out) :: h
+    real(dp), dimension(n), intent(out) :: hp
+
+    integer(i4b) :: i,j,k
+    real(dp) :: prod1,prod2
+
+
+    do i = 1,n
+       prod1 = 1.0_dp
+       prod2 = 1.0_dp
+       do j = 1,n
+          if(j /= i) then
+             prod1 = prod1*(x-xn(j))
+             prod2 = prod2*(xn(i)-xn(j))
+          endif
+       end do
+       h(i) = prod1/prod2
+
+       hp(i) = 0.0_dp
+       do j = 1,n
+          if(j /= i) then
+             prod1 = 1.0_dp
+             do k = 1,n
+                if(k /= i .and. k/= j) then
+                   prod1 = prod1*(x-xn(k))
+                end if
+             end do
+             hp(i) = hp(i) + prod1
+          end if
+       end do
+       hp(i) = hp(i)/prod2
+    end do
+
+
+    
+    return
+  end subroutine lagrange_polynomial
+  
   
 end module module_special_functions
