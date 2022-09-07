@@ -31,6 +31,9 @@ module module_meshing
      real(dp), dimension(:), allocatable :: jac
      real(dp), dimension(:,:), allocatable :: hp
      real(dp), dimension(:,:), allocatable :: rho
+     real(dp), dimension(:,:), allocatable :: g
+     real(dp), dimension(:,:), allocatable :: p
+     real(dp), dimension(:,:), allocatable :: ep
   end type spherical_layer_mesh
 
 
@@ -71,9 +74,102 @@ module module_meshing
   end type spherical_maxwell_layer_mesh
 
 
+  type boolean_array
+     integer(i4b) :: nsections
+     integer(i4b) :: ndim
+     integer(i4b) :: ngll
+     type(boolean_array_section), dimension(:), allocatable :: section
+   contains
+     procedure :: get => get_boolean_array
+  end type boolean_array
+
+  type boolean_array_section
+     integer(i4b) :: nlayers
+     type(boolean_array_layer), dimension(:), allocatable :: layer
+   contains
+     procedure :: get => get_boolean_array_section
+  end type boolean_array_section
+  
+  type boolean_array_layer
+     integer(i4b) :: nvar
+     integer(i4b), dimension(:,:,:), allocatable :: data
+   contains
+     procedure :: get => get_boolean_array_layer
+  end type boolean_array_layer
+
+  interface spherical_mesh
+     procedure :: make_spherical_mesh
+  end interface spherical_mesh
+
+
+  
 contains
 
 
+  !===========================================================!
+  !               routines for Boolean arrays                 !
+  !===========================================================!
+
+  
+  
+  integer(i4b) function get_boolean_array_layer(self,ivar,inode,ispec) result(i)
+    class(boolean_array_layer), intent(in) :: self
+    integer(i4b), intent(in) :: ivar,inode,ispec
+    i = self%data(ivar,inode,ispec)
+    return
+  end function get_boolean_array_layer
+
+
+  integer(i4b) function get_boolean_array_section(self,ivar,inode,ispec,ilayer) result(i)
+    class(boolean_array_section), intent(in) :: self
+    integer(i4b), intent(in) :: ivar,inode,ispec,ilayer
+    i = self%layer(ilayer)%get(ivar,inode,ispec)
+    return
+  end function get_boolean_array_section
+
+
+  integer(i4b) function get_boolean_array(self,ivar,inode,ispec,ilayer,isection) result(i)
+    class(boolean_array), intent(in) :: self
+    integer(i4b), intent(in) :: ivar,inode,ispec,ilayer,isection
+    i = self%section(isection)%get(ivar,inode,ispec,ilayer)
+    return
+  end function get_boolean_array
+
+
+  type(boolean_array) function build_boolean_array_scalar_field(mesh) result(ibool)
+    type(spherical_model_mesh), intent(in) :: mesh
+    integer(i4b) :: isection,ilayer,ngll,nspec,count,ispec,inode
+    count = 0
+    ibool%nsections = mesh%nsections
+    ibool%ngll = 0
+    allocate(ibool%section(ibool%nsections))
+    do isection = 1,ibool%nsections
+       ibool%section(isection)%nlayers = mesh%section(isection)%nlayers
+       allocate(ibool%section(isection)%layer(ibool%section(isection)%nlayers))
+       do ilayer = 1,ibool%section(isection)%nlayers
+          ibool%section(isection)%layer(ilayer)%nvar = 1
+          ngll = mesh%section(isection)%layer(ilayer)%ngll
+          if(ngll > ibool%ngll) ibool%ngll = ngll
+          nspec = mesh%section(isection)%layer(ilayer)%nspec
+          allocate(ibool%section(isection)%layer(ilayer)%data(1,ngll,nspec))
+          do ispec = 1,nspec
+             do inode = 1,ngll
+                count = count + 1
+                ibool%section(isection)%layer(ilayer)%data(1,inode,ispec) = count
+             end do
+             count = count-1
+          end do
+       end do
+    end do
+    ibool%ndim = count+1
+    return
+  end function build_boolean_array_scalar_field
+  
+
+  !===========================================================!
+  !                routines for mesh building                 !
+  !===========================================================!
+  
   function make_spherical_mesh(ngll,model,drmax) result(mesh)
     integer(i4b), intent(in) :: ngll
     type(spherical_model), intent(in) :: model
@@ -225,7 +321,7 @@ contains
        do inode = 1,ngll
           r = r11 + 0.5_dp*(quad%x(inode)+1.0_dp)*(r22-r11)
           mesh%r(inode,ispec) = r
-          mesh%rho(inode,ispec) = layer%rho(r)                         
+          mesh%rho(inode,ispec) = layer%rho(r)
        end do
        mesh%jac(ispec) = 0.5_dp*(r22-r11)
        r11 = r22
@@ -381,10 +477,82 @@ contains
 
 
 
+  !================================================================================!
+  !            routines to calculate gravity, pressure and ellipticity             !
+  !================================================================================!
 
-  
+
+  subroutine calculate_gravity(mesh)
+    class(spherical_model_mesh), intent(inout) :: mesh
+
+    integer(i4b) :: ndim,kd,ldab,isection,ilayer,inode, &
+                    ispec,jnode,knode,ngll,nspec
+    type(boolean_array_layer) :: ibool_layer
+    type(boolean_array) :: ibool
+    real(dp), dimension(:,:), allocatable :: a,b
+
+    
+    ! make the Boolean array
+    ibool =  build_boolean_array_scalar_field(mesh)
+
+    ! number of degrees of freedom
+    ndim = ibool%ndim
+    kd = ibool%ngll-1
+    ldab = kd+1
+
+    ! allocate arrays for matrix and RHS
+    allocate(a(ldab,ndim),b(ndim,1))
 
 
+    ! build up the system matrix
+    a = 0.0_dp
+    do isection = 1,mesh%nsections
 
+       do ilayer = 1,mesh%section(isection)%nlayers
+
+
+          ! get local mesh parameters
+          ngll = mesh%section(isection)%layer(ilayer)%ngll
+          nspec = mesh%section(isection)%layer(ilayer)%nspec
+
+          ! get local Boolean array
+          ibool_layer = ibool%section(isection)%layer(ilayer)
+
+          ! loop over spectral elements
+          do ispec = 1,nspec
+
+             ! first loop over nodes
+             do inode = 1,ngll
+
+
+                
+
+                
+             end do
+             ! end first loop over nodes
+             
+             
+          end do
+          ! end loop over spectral elements
+          
+          
+       end do
+       
+    end do
+
+
+    ! compute the factorisation
+    
+
+    ! build the RHS
+
+
+    ! solve the linear system
+
+
+    ! convert from potential to gravity
+    
+    return
+  end subroutine calculate_gravity
   
 end module module_meshing
