@@ -1,6 +1,7 @@
 module module_meshing
 
   use module_constants
+  use module_physical_constants
   use module_spherical_model
   use module_quadrature
   use module_special_functions
@@ -274,6 +275,7 @@ contains
        
     end do
 
+    call calculate_gravity(mesh)
 
     return
   end function make_spherical_mesh
@@ -303,6 +305,7 @@ contains
     do inode = 1,ngll
        call lagrange_polynomial(quad%x(inode),ngll,quad%x,h,mesh%hp(inode,:))
     end do
+
     
     ! work out number of spectral elements
     r1 = layer%r1
@@ -313,6 +316,7 @@ contains
     allocate(mesh%r(ngll,mesh%nspec))
     allocate(mesh%jac(mesh%nspec))
     allocate(mesh%rho(ngll,mesh%nspec))
+    allocate(mesh%g(ngll,mesh%nspec))
     
     dr = (r2-r1)/nspec
     r11 = r1
@@ -486,8 +490,7 @@ contains
     class(spherical_model_mesh), intent(inout) :: mesh
 
     integer(i4b) :: ndim,kd,ldab,isection,ilayer,inode, &
-                    ispec,jnode,knode,ngll,nspec
-    type(boolean_array_layer) :: ibool_layer
+                    ispec,jnode,knode,ngll,nspec,i,j,k,info
     type(boolean_array) :: ibool
     real(dp), dimension(:,:), allocatable :: a,b
 
@@ -497,62 +500,89 @@ contains
 
     ! number of degrees of freedom
     ndim = ibool%ndim
-    kd = ibool%ngll-1
+    kd   = ibool%ngll-1
     ldab = kd+1
 
     ! allocate arrays for matrix and RHS
     allocate(a(ldab,ndim),b(ndim,1))
 
 
-    ! build up the system matrix
+    ! build up the system matrix and RHS
     a = 0.0_dp
+    b = 0.0_dp
     do isection = 1,mesh%nsections
-
        do ilayer = 1,mesh%section(isection)%nlayers
-
-
-          ! get local mesh parameters
-          ngll = mesh%section(isection)%layer(ilayer)%ngll
-          nspec = mesh%section(isection)%layer(ilayer)%nspec
-
-          ! get local Boolean array
-          ibool_layer = ibool%section(isection)%layer(ilayer)
-
-          ! loop over spectral elements
-          do ispec = 1,nspec
-
-             ! first loop over nodes
-             do inode = 1,ngll
-
-
-                
-
-                
-             end do
-             ! end first loop over nodes
-             
-             
-          end do
-          ! end loop over spectral elements
-          
-          
+          associate(ngll  => mesh%section(isection)%layer(ilayer)%ngll,  &
+                    nspec => mesh%section(isection)%layer(ilayer)%nspec, &
+                    w     => mesh%section(isection)%layer(ilayer)%w,     &
+                    hp    => mesh%section(isection)%layer(ilayer)%hp,    &
+                    jac   => mesh%section(isection)%layer(ilayer)%jac,   &
+                    r     => mesh%section(isection)%layer(ilayer)%r,     &
+                    ibool => ibool%section(isection)%layer(ilayer),      &
+                    rho => mesh%section(isection)%layer(ilayer)%rho)
+            do ispec = 1,nspec
+               do inode = 1,ngll
+                  i = ibool%get(1,inode,ispec)
+                  do jnode = inode,ngll
+                     j = ibool%get(1,jnode,ispec)
+                     k = kd + 1 + i - j
+                     do knode = 1,ngll
+                        a(k,j) = a(k,j) + hp(knode,inode)*hp(knode,jnode) &
+                                        * r(knode,ispec)**2*w(knode)/jac(ispec)                      
+                     end do
+                  end do
+                  b(i,1) = b(i,1) + rho(inode,ispec)*r(inode,ispec)**2 &
+                                  * w(inode)*jac(ispec)
+               end do
+            end do
+          end associate
        end do
-       
     end do
 
 
-    ! compute the factorisation
+    ! add in DTN term at the surface
+    k = kd+1
+    a(k,ndim) = a(k,ndim) + mesh%r2
+
+    ! scale the RHS
+    b = -4.0_dp*pi*bigg*b
     
-
-    ! build the RHS
-
+    ! compute the factorisation
+    call dpbtrf('U',ndim,kd,a,ldab,info)
+    call error(info /= 0,'calculate_gravity','problem with factorisation')
 
     ! solve the linear system
-
+    call dpbtrs	('U',ndim,kd,1,a,ldab,b,ndim,info)
+    call error(info /= 0,'calculate_gravity','problem with substitution')
 
     ! convert from potential to gravity
+    do isection = 1,mesh%nsections
+       do ilayer = 1,mesh%section(isection)%nlayers
+          associate(ngll  => mesh%section(isection)%layer(ilayer)%ngll,  &
+                    nspec => mesh%section(isection)%layer(ilayer)%nspec, &
+                    hp    => mesh%section(isection)%layer(ilayer)%hp,    &
+                    jac   => mesh%section(isection)%layer(ilayer)%jac,   &
+                    r     => mesh%section(isection)%layer(ilayer)%r,     &
+                    rho   => mesh%section(isection)%layer(ilayer)%rho,   &
+                    g     => mesh%section(isection)%layer(ilayer)%g,     &
+                    ibool => ibool%section(isection)%layer(ilayer))
+            do ispec = 1,nspec
+               do inode = 1,ngll
+                  g(inode,ispec) = 0.0_dp
+                  do jnode = 1,ngll
+                     j = ibool%get(1,jnode,ispec)
+                     g(inode,ispec) = g(inode,ispec) + b(j,1)*hp(inode,jnode)/jac(ispec)
+                  end do
+               end do
+            end do
+          end associate
+       end do
+    end do
     
     return
   end subroutine calculate_gravity
+
+
+
   
 end module module_meshing
