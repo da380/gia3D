@@ -49,7 +49,8 @@ module module_meshing
   end type spherical_solid_elastic_layer_mesh
 
 
-  type, extends(spherical_layer_mesh) ::  spherical_fluid_elastic_layer_mesh     
+  type, extends(spherical_layer_mesh) ::  spherical_fluid_elastic_layer_mesh
+     real(dp), dimension(:,:), allocatable :: drho
      real(dp), dimension(:,:), allocatable :: kappa
   end type spherical_fluid_elastic_layer_mesh
   
@@ -77,8 +78,9 @@ module module_meshing
 
   type boolean_array
      integer(i4b) :: nsections
-     integer(i4b) :: ndim
+     integer(i4b) :: ndim     
      integer(i4b) :: ngll
+     integer(i4b) :: isection1
      type(boolean_array_section), dimension(:), allocatable :: section
    contains
      procedure :: get => get_boolean_array
@@ -86,6 +88,7 @@ module module_meshing
 
   type boolean_array_section
      integer(i4b) :: nlayers
+     integer(i4b) :: ilayer1
      type(boolean_array_layer), dimension(:), allocatable :: layer
    contains
      procedure :: get => get_boolean_array_section
@@ -93,6 +96,7 @@ module module_meshing
   
   type boolean_array_layer
      integer(i4b) :: nvar
+     integer(i4b) :: ispec1
      integer(i4b), dimension(:,:,:), allocatable :: data
    contains
      procedure :: get => get_boolean_array_layer
@@ -105,66 +109,6 @@ module module_meshing
 
   
 contains
-
-
-  !===========================================================!
-  !               routines for Boolean arrays                 !
-  !===========================================================!
-
-  
-  
-  integer(i4b) function get_boolean_array_layer(self,ivar,inode,ispec) result(i)
-    class(boolean_array_layer), intent(in) :: self
-    integer(i4b), intent(in) :: ivar,inode,ispec
-    i = self%data(ivar,inode,ispec)
-    return
-  end function get_boolean_array_layer
-
-
-  integer(i4b) function get_boolean_array_section(self,ivar,inode,ispec,ilayer) result(i)
-    class(boolean_array_section), intent(in) :: self
-    integer(i4b), intent(in) :: ivar,inode,ispec,ilayer
-    i = self%layer(ilayer)%get(ivar,inode,ispec)
-    return
-  end function get_boolean_array_section
-
-
-  integer(i4b) function get_boolean_array(self,ivar,inode,ispec,ilayer,isection) result(i)
-    class(boolean_array), intent(in) :: self
-    integer(i4b), intent(in) :: ivar,inode,ispec,ilayer,isection
-    i = self%section(isection)%get(ivar,inode,ispec,ilayer)
-    return
-  end function get_boolean_array
-
-
-  type(boolean_array) function build_boolean_array_scalar_field(mesh) result(ibool)
-    type(spherical_model_mesh), intent(in) :: mesh
-    integer(i4b) :: isection,ilayer,ngll,nspec,count,ispec,inode
-    count = 0
-    ibool%nsections = mesh%nsections
-    ibool%ngll = 0
-    allocate(ibool%section(ibool%nsections))
-    do isection = 1,ibool%nsections
-       ibool%section(isection)%nlayers = mesh%section(isection)%nlayers
-       allocate(ibool%section(isection)%layer(ibool%section(isection)%nlayers))
-       do ilayer = 1,ibool%section(isection)%nlayers
-          ibool%section(isection)%layer(ilayer)%nvar = 1
-          ngll = mesh%section(isection)%layer(ilayer)%ngll
-          if(ngll > ibool%ngll) ibool%ngll = ngll
-          nspec = mesh%section(isection)%layer(ilayer)%nspec
-          allocate(ibool%section(isection)%layer(ilayer)%data(1,ngll,nspec))
-          do ispec = 1,nspec
-             do inode = 1,ngll
-                count = count + 1
-                ibool%section(isection)%layer(ilayer)%data(1,inode,ispec) = count
-             end do
-             count = count-1
-          end do
-       end do
-    end do
-    ibool%ndim = count+1
-    return
-  end function build_boolean_array_scalar_field
   
 
   !===========================================================!
@@ -208,6 +152,8 @@ contains
     end do
       
     do isection = 1,mesh%nsections
+       mesh%section(isection)%r1 = model%section(isection)%r1
+       mesh%section(isection)%r2 = model%section(isection)%r2       
        do ilayer = 1,mesh%section(isection)%nlayers
 
           associate( layer => model%section(isection)%layer(ilayer), & 
@@ -379,18 +325,24 @@ contains
     real(dp), intent(in) :: drmax
     type(spherical_fluid_elastic_layer_mesh) :: mesh
 
-    integer(i4b) :: ispec,nspec,inode,jspec
+    integer(i4b) :: ispec,nspec,inode,jnode
     real(dp) :: r
         
     mesh%spherical_layer_mesh = make_spherical_layer_mesh(ngll,layer,drmax)
     allocate(mesh%kappa(mesh%ngll,mesh%nspec))
+    allocate(mesh%drho(mesh%ngll,mesh%nspec))
     do ispec = 1,mesh%nspec
        do inode = 1,mesh%ngll
           r = mesh%r(inode,ispec)
           mesh%kappa(inode,ispec) = layer%kappa(r)
+          mesh%drho(inode,ispec) = 0.0_dp
+          do jnode = 1,mesh%ngll
+             mesh%drho(inode,ispec) = mesh%drho(inode,ispec) + mesh%rho(jnode,ispec)  &
+                                                             * mesh%hp(inode,jnode)   &
+                                                             / mesh%jac(ispec)
+          end do          
        end do
     end do
-    
     
     return
   end function make_spherical_fluid_elastic_layer_mesh
@@ -481,6 +433,174 @@ contains
 
 
 
+  !===========================================================!
+  !               routines for Boolean arrays                 !
+  !===========================================================!
+
+  
+  
+  integer(i4b) function get_boolean_array_layer(self,ivar,inode,ispec) result(i)
+    class(boolean_array_layer), intent(in) :: self
+    integer(i4b), intent(in) :: ivar,inode,ispec
+    i = self%data(ivar,inode,ispec)
+    return
+  end function get_boolean_array_layer
+
+
+  integer(i4b) function get_boolean_array_section(self,ivar,inode,ispec,ilayer) result(i)
+    class(boolean_array_section), intent(in) :: self
+    integer(i4b), intent(in) :: ivar,inode,ispec,ilayer
+    i = self%layer(ilayer)%get(ivar,inode,ispec)
+    return
+  end function get_boolean_array_section
+
+
+  integer(i4b) function get_boolean_array(self,ivar,inode,ispec,ilayer,isection) result(i)
+    class(boolean_array), intent(in) :: self
+    integer(i4b), intent(in) :: ivar,inode,ispec,ilayer,isection
+    i = self%section(isection)%get(ivar,inode,ispec,ilayer)
+    return
+  end function get_boolean_array
+
+
+  type(boolean_array) function build_boolean_simple(mesh) result(ibool)
+    type(spherical_model_mesh), intent(in) :: mesh
+    integer(i4b) :: isection,ilayer,ngll,nspec,count,ispec,inode
+    count = 0
+    ibool%nsections = mesh%nsections
+    ibool%isection1 = 1
+    ibool%ngll = 0    
+    allocate(ibool%section(ibool%nsections))
+    do isection = 1,ibool%nsections
+       ibool%section(isection)%nlayers = mesh%section(isection)%nlayers
+       ibool%section(isection)%ilayer1 = 1
+       allocate(ibool%section(isection)%layer(ibool%section(isection)%nlayers))
+       do ilayer = 1,ibool%section(isection)%nlayers
+          ibool%section(isection)%layer(ilayer)%nvar = 1
+          ibool%section(isection)%layer(ilayer)%ispec1 = 1
+          ngll = mesh%section(isection)%layer(ilayer)%ngll
+          if(ngll > ibool%ngll) ibool%ngll = ngll
+          nspec = mesh%section(isection)%layer(ilayer)%nspec
+          allocate(ibool%section(isection)%layer(ilayer)%data(1,ngll,nspec))
+
+          do ispec = 1,nspec
+             do inode = 1,ngll
+                count = count + 1
+                ibool%section(isection)%layer(ilayer)%data(1,inode,ispec) = count
+             end do
+             count = count-1
+          end do
+       end do
+    end do
+    ibool%ndim = count+1
+ 
+    return
+  end function build_boolean_simple
+
+
+
+
+  type(boolean_array) function build_boolean_toroidal(mesh,rstart) result(ibool)
+    type(spherical_model_mesh), intent(in) :: mesh
+    real(dp), intent(in), optional :: rstart
+
+    real(dp) :: r1,r2,rs
+    integer(i4b) :: nsections,isection,ilayer,ngll,nspec,count, &
+                    ispec,inode,nlayers,ilayer1,ispec1,ngllm
+
+    ! work out if the top section is solid
+    nsections = mesh%nsections
+    associate(layer => mesh%section(nsections)%layer(1))
+      select type(layer)
+      class is(spherical_solid_elastic_layer_mesh)
+         ibool%nsections = nsections
+         ibool%isection1 = nsections
+         allocate(ibool%section(nsections:nsections))
+      class is(spherical_fluid_elastic_layer_mesh)
+         ibool%nsections = 0
+         return
+      class default
+         stop 'build_boolean_toroidal: invalid mesh'         
+      end select
+    end associate
+
+    ! work out what layer to start in
+    associate(section => mesh%section(nsections), &
+              ibool   => ibool%section(nsections))    
+      r1 = section%r1
+      r2 = section%r2
+      rs = r1
+      if(present(rstart)) then
+         rs = max(r1,rstart)
+         rs = min(rs,r2)
+      end if
+      nlayers = section%nlayers
+      ilayer1 = nlayers
+      do ilayer = 1,nlayers
+         r1 = section%layer(ilayer)%r1
+         r2 = section%layer(ilayer)%r2         
+         if(rs >= r1 .and. rs < r2) then
+            ilayer1 = ilayer
+            exit
+         end if
+      end do
+      ibool%ilayer1 = ilayer1
+      ibool%nlayers = nlayers
+      allocate(ibool%layer(ilayer1:nlayers))
+    end associate
+    
+    ! work out what spectral element to start in
+    associate(section => mesh%section(nsections),       & 
+              layer => mesh%section(nsections)%layer(ilayer1),  &
+              ibool => ibool%section(nsections)%layer(ilayer1))
+      nspec = layer%nspec
+      ngll  = layer%ngll
+      ispec1 = nspec
+      do ispec = 1,nspec
+         r1 = layer%r(1,ispec)
+         r2 = layer%r(ngll,ispec)
+         if(rs >= r1 .and. rs < r2) then
+            ispec1 = ispec
+            exit
+         end if
+      end do
+    end associate
+  
+ 
+
+    ! build up the Boolean arrays
+    associate(section => mesh%section(nsections), &
+              ibool   => ibool%section(nsections))
+      count = 0
+      ngllm = 0
+      do ilayer = ibool%ilayer1,section%nlayers
+         associate(layer => section%layer(ilayer), &
+                   ibool => ibool%layer(ilayer))
+           nspec = layer%nspec
+           ngll  = layer%ngll
+           if(ngll > ngllm) ngllm = ngll
+           ibool%ispec1 = ispec1
+           allocate(ibool%data(1,ngll,ispec1:nspec))
+           do ispec = ispec1,nspec
+              do inode = 1,ngll
+                 count = count+1
+                 ibool%data(1,inode,ispec) = count
+              end do
+              ispec1 = 1
+              count = count-1
+           end do
+         end associate
+      end do
+    end associate
+    ibool%ndim = count+1
+    ibool%ngll = ngllm
+    
+  
+    return
+  end function build_boolean_toroidal
+
+  
+
   !================================================================================!
   !            routines to calculate gravity, pressure and ellipticity             !
   !================================================================================!
@@ -496,9 +616,9 @@ contains
 
     
     ! make the Boolean array
-    ibool =  build_boolean_array_scalar_field(mesh)
+    ibool =  build_boolean_simple(mesh)
 
-    ! number of degrees of freedom
+    ! set the dimensions
     ndim = ibool%ndim
     kd   = ibool%ngll-1
     ldab = kd+1
@@ -581,7 +701,6 @@ contains
     
     return
   end subroutine calculate_gravity
-
 
 
   
