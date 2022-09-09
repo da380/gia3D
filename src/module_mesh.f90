@@ -503,7 +503,7 @@ contains
     real(dp) :: r1,r2,rs
 
 
-    isection11 = -1
+    isection11 = mesh%nsections+1
     ! work out which section to start looking in
     do isection = mesh%nsections,1,-1
 
@@ -530,8 +530,8 @@ contains
     end do
 
     
-    if(isection11 == -1) then
-       ibool%isection1 = -1
+    if(isection11 == mesh%nsections+1) then
+       ibool%isection1 = isection11
        return
     end if
     
