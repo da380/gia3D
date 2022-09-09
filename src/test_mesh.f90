@@ -8,7 +8,7 @@ program test_mesh
   use module_special_functions
   implicit none
 
-  integer(i4b) :: ngll,nspec,inode,ispec,ilayer,nlayers,isection,i,count
+  integer(i4b) :: ngll,nspec,inode,ispec,ilayer,nlayers,isection,i,count,ndim
   real(dp) :: drmax,rstart
   type(spherical_model), allocatable :: model
   type(spherical_model_mesh) :: mesh
@@ -20,30 +20,50 @@ program test_mesh
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
 
-  rstart = 0.6*mesh%r2
-  ibool = build_boolean_toroidal(mesh,rstart)
+  rstart = 0.*mesh%r2
+  ibool = build_boolean_spheroidal(mesh,rstart)
+
+  ndim = ibool%ndim
 
   
   count = 0
-  do isection = ibool%isection1,ibool%nsections
+  do isection = ibool%isection1,mesh%nsections
 
      
      
-     associate(ibool => ibool%section(isection))
+     associate(ibool => ibool%section(isection), &
+               section => mesh%section(isection))
 
-       do ilayer = ibool%ilayer1,ibool%nlayers
+       do ilayer = ibool%ilayer1,section%nlayers
 
           associate(ibool => ibool%layer(ilayer), &
-                    mesh => mesh%section(isection)%layer(ilayer))
+                    layer => section%layer(ilayer))
 
-            ngll = mesh%ngll
-            nspec = mesh%nspec
+            ngll = layer%ngll
+            nspec = layer%nspec
 
             do ispec = ibool%ispec1,nspec
 
                do inode = 1,ngll
-                  count = count + 1
-                  print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)-count
+
+                  select type(layer)
+
+                  class is(spherical_solid_elastic_layer_mesh)
+                     
+                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec), &
+                                                          ibool%get(2,inode,ispec), &
+                                                          ibool%get(3,inode,ispec)
+
+
+                  class is(spherical_fluid_elastic_layer_mesh)
+
+                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
+
+                     
+                     
+                  end select
+                  
+
                end do
                count = count -1
                
@@ -52,14 +72,20 @@ program test_mesh
             
             
           end associate
+
+       print *, '--------------------------------------------------------------------'
           
        end do
+
 
        
      end associate
 
+     print *, '===================================================================='
      
   end do
+
+  print *, ndim
   
   
 end program test_mesh
