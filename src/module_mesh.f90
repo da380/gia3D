@@ -494,61 +494,101 @@ contains
   end function build_boolean_simple
 
 
-
-
   type(boolean_array) function build_boolean_toroidal(mesh,rstart) result(ibool)
     type(spherical_model_mesh), intent(in) :: mesh
     real(dp), intent(in), optional :: rstart
 
+    integer(i4b) :: isection1,isection,nsections,ilayer,ilayer1,nlayers, &
+                    ngll,nspec,ispec,ispec1,inode,count,ngllm,isection11
     real(dp) :: r1,r2,rs
-    integer(i4b) :: nsections,isection,ilayer,ngll,nspec,count, &
-                    ispec,inode,nlayers,ilayer1,ispec1,ngllm
 
-    ! work out if the top section is solid
+
+    isection11 = -1
+    ! work out which section to start looking in
+    do isection = mesh%nsections,1,-1
+
+       associate(layer => mesh%section(isection)%layer(1))
+
+         select type(layer)
+
+         class is(spherical_solid_elastic_layer_mesh)
+
+            isection11 = isection
+            
+         class is(spherical_fluid_elastic_layer_mesh)
+
+            exit 
+            
+         class default
+
+            stop 'build_boolean_toroidal: invalid mesh'
+
+         end select
+         
+       end associate
+       
+    end do
+
+    
+    if(isection11 == -1) then
+       ibool%isection1 = -1
+       return
+    end if
+    
+    r1 = mesh%section(isection11)%r1
+    r2 = mesh%r2
+    rs = r1
+    if(present(rstart)) then
+       rs = max(r1,rstart)
+       rs = min(rs,r2)
+    end if
+
+
+    ! work out what section to start in
     nsections = mesh%nsections
-    associate(layer => mesh%section(nsections)%layer(1))
-      select type(layer)
-      class is(spherical_solid_elastic_layer_mesh)
-         ibool%isection1 = nsections
-         allocate(ibool%section(nsections:nsections))
-      class is(spherical_fluid_elastic_layer_mesh)
-         ibool%isection1 = -1
-         return
-      class default
-         stop 'build_boolean_toroidal: invalid mesh'         
-      end select
-    end associate
+    isection1 = nsections
+    do isection = isection11,nsections
+       associate(section => mesh%section(isection))
+         r1 = section%r1
+         r2 = section%r2
+         if(rs >= r1 .and. rs < r2) then
+            isection1 = isection
+            exit
+         end if
+       end associate
+    end do
+
+    
+    ibool%isection1 = isection1
+    allocate(ibool%section(isection1:nsections))
 
     ! work out what layer to start in
-    associate(section => mesh%section(nsections), &
-              ibool   => ibool%section(nsections))    
-      r1 = section%r1
-      r2 = section%r2
-      rs = r1
-      if(present(rstart)) then
-         rs = max(r1,rstart)
-         rs = min(rs,r2)
-      end if
-      nlayers = section%nlayers
-      ilayer1 = nlayers
-      do ilayer = 1,nlayers
-         r1 = section%layer(ilayer)%r1
-         r2 = section%layer(ilayer)%r2         
+    nlayers = mesh%section(isection1)%nlayers
+    ilayer1 = nlayers
+    do ilayer = 1,nlayers
+       associate(layer => mesh%section(isection1)%layer(ilayer))
+         r1 = layer%r1
+         r2 = layer%r2
          if(rs >= r1 .and. rs < r2) then
             ilayer1 = ilayer
             exit
          end if
-      end do
-      ibool%ilayer1 = ilayer1
-      allocate(ibool%layer(ilayer1:nlayers))
-    end associate
+       end associate
+    end do
     
-    ! work out what spectral element to start in
-    associate(section => mesh%section(nsections),       & 
-              layer => mesh%section(nsections)%layer(ilayer1),  &
-              ibool => ibool%section(nsections)%layer(ilayer1))
-      nspec = layer%nspec
-      ngll  = layer%ngll
+    ibool%section(isection1)%ilayer1 = ilayer1
+    allocate(ibool%section(isection1)%layer(ilayer1:nlayers))                
+    do isection = isection1+1,nsections
+       ibool%section(isection)%ilayer1 = 1
+       nlayers = mesh%section(isection)%nlayers
+       allocate(ibool%section(isection)%layer(nlayers))                
+    end do
+
+
+    ! work out what element to start in
+    associate(layer => mesh%section(isection1)%layer(ilayer1))
+      ngll   = layer%ngll
+      nspec  = layer%nspec
       ispec1 = nspec
       do ispec = 1,nspec
          r1 = layer%r(1,ispec)
@@ -559,36 +599,58 @@ contains
          end if
       end do
     end associate
-  
- 
+    ibool%section(isection1)%layer(ilayer1)%ispec1 = ispec1
+    nlayers = mesh%section(isection1)%nlayers
+    do ilayer = ilayer+1,nlayers
+       ibool%section(isection1)%layer(ilayer)%ispec1 = 1       
+    end do
+    do isection = isection1 + 1,nsections
+       ilayer1 = ibool%section(isection)%ilayer1
+       nlayers = mesh%section(isection)%nlayers
+       do ilayer = ilayer1,nlayers
+          ibool%section(isection)%layer(ilayer)%ispec1 = 1       
+       end do       
+    end do
 
-    ! build up the Boolean arrays
-    associate(section => mesh%section(nsections), &
-              ibool   => ibool%section(nsections))
-      count = 0
-      ngllm = 0
-      do ilayer = ibool%ilayer1,section%nlayers
-         associate(layer => section%layer(ilayer), &
-                   ibool => ibool%layer(ilayer))
-           nspec = layer%nspec
-           ngll  = layer%ngll
-           if(ngll > ngllm) ngllm = ngll
-           ibool%ispec1 = ispec1
-           allocate(ibool%data(1,ngll,ispec1:nspec))
-           do ispec = ispec1,nspec
-              do inode = 1,ngll
-                 count = count+1
-                 ibool%data(1,inode,ispec) = count
-              end do
-              ispec1 = 1
-              count = count-1
-           end do
-         end associate
-      end do
-    end associate
+    
+    ! build up the boolean array
+    count = 0
+    ngllm = 0
+    do isection = isection1,nsections
+
+       ilayer1 = ibool%section(isection)%ilayer1
+       nlayers = mesh%section(isection)%nlayers
+       
+       do ilayer = ilayer1,nlayers
+
+          ispec1 = ibool%section(isection)%layer(ilayer)%ispec1
+          nspec  = mesh%section(isection)%layer(ilayer)%nspec
+          ngll   = mesh%section(isection)%layer(ilayer)%ngll
+          if(ngll > ngllm) ngllm = ngll
+          
+          
+          associate(layer => mesh%section(isection)%layer(ilayer), &
+                    ibool => ibool%section(isection)%layer(ilayer))
+
+                        
+            allocate(ibool%data(1,ngll,ispec1:nspec))
+            do ispec = ispec1,nspec
+               do inode = 1,ngll
+                  count = count + 1
+                  ibool%data(1,inode,ispec) = count
+               end do
+               count = count-1
+            end do
+                        
+          end associate
+          
+       end do
+       
+    end do
+
     ibool%ndim = count+1
     ibool%ngll = ngllm
-    
+
   
     return
   end function build_boolean_toroidal
@@ -601,7 +663,7 @@ contains
 
     logical :: solid
     integer(i4b) :: isection1,isection,nsections,ilayer,ilayer1,nlayers, &
-                    ngll,nspec,ispec,ispec1,inode,count
+                    ngll,nspec,ispec,ispec1,inode,count,ngllm
     real(dp) :: r1,r2,rs
     
     r1 = mesh%r1
@@ -684,6 +746,7 @@ contains
     ! build up the boolean array
     solid = .false.
     count = 0
+    ngllm = 0
     do isection = isection1,nsections
 
        ilayer1 = ibool%section(isection)%ilayer1
@@ -694,7 +757,8 @@ contains
           ispec1 = ibool%section(isection)%layer(ilayer)%ispec1
           nspec  = mesh%section(isection)%layer(ilayer)%nspec
           ngll   = mesh%section(isection)%layer(ilayer)%ngll
-
+          if(ngll > ngllm) ngllm = ngll
+          
           
           associate(layer => mesh%section(isection)%layer(ilayer), &
                     ibool => ibool%section(isection)%layer(ilayer))
@@ -746,6 +810,7 @@ contains
     end do
 
     ibool%ndim = count+1
+    ibool%ngll = ngllm
     
     return
   end function build_boolean_spheroidal

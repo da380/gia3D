@@ -20,9 +20,9 @@ program test_mesh
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
 
-  rstart = 0.*mesh%r2
-  ibool = build_boolean_spheroidal(mesh,rstart)
-
+  rstart = 0.6*mesh%r2
+  !  ibool = build_boolean_spheroidal(mesh,rstart)
+  ibool = build_boolean_toroidal(mesh,rstart)  
   ndim = ibool%ndim
 
   
@@ -50,11 +50,12 @@ program test_mesh
 
                   class is(spherical_solid_elastic_layer_mesh)
                      
-                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec), &
-                                                          ibool%get(2,inode,ispec), &
-                                                          ibool%get(3,inode,ispec)
+!                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec), &
+!                                                          ibool%get(2,inode,ispec), &
+!                                                          ibool%get(3,inode,ispec)
 
-
+                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
+                     
                   class is(spherical_fluid_elastic_layer_mesh)
 
                      print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
