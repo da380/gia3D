@@ -239,7 +239,7 @@ contains
     mesh%r2 = layer%r2
 
     ! set the quadrature scheme
-    call quad%set(ngll,legendre())
+    call quad%set(ngll)
     mesh%w = quad%w
 
     ! store the lagrange derivatives

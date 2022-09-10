@@ -18,7 +18,9 @@ FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3)
 
 
 # libraries to link to
-LIBS =  -llapack -lfftw3 -lblas
+LIBS =  -lfftw3 -lblas -llapack
+
+
 
 # set some parameters
 MV=mv -f

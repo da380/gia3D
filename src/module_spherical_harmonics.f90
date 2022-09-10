@@ -267,7 +267,6 @@ contains
     
     integer(i4b) :: l,ith,n,nth,nph,cdim
     real(dp) :: fac
-    class(orthogonal_polynomial), allocatable :: poly
     type(gauss_quadrature) :: quad
     real(C_DOUBLE), pointer :: rin(:)
     complex(C_DOUBLE_COMPLEX), pointer ::  in(:)
@@ -296,8 +295,7 @@ contains
     ! make the quadrature points and weights
     allocate(grid%th(lmax+1))
     allocate(grid%w(lmax+1))
-    poly = legendre()
-    call quad%set(lmax+1,poly)
+    call quad%set(lmax+1)
     grid%th = acos(quad%points())
     grid%w = quad%weights()
 
@@ -925,8 +923,10 @@ contains
     implicit none
     class(gauss_legendre_field), intent(inout) :: self
     complex(dpc), intent(in) :: a
+    real(dp) :: ar
+    ar = real(a)
     call zscal(self%cdim,a,self%cdata,1)
-    call dscal(self%rdim,real(a,kind=dp),self%rdata,1)
+    call dscal(self%rdim,ar,self%rdata,1)
     return
   end subroutine scale_gauss_legendre_field
 
@@ -934,7 +934,9 @@ contains
     implicit none
     class(gauss_legendre_field), intent(inout) :: self
     real(dp), intent(in) :: a
-    call zdscal(self%cdim,a,self%cdata,1)
+    complex(dpc) :: ac
+    ac = a
+    call zdscal(self%cdim,ac,self%cdata,1)
     call dscal(self%rdim,a,self%rdata,1)
     return
   end subroutine real_scale_gauss_legendre_field
@@ -944,8 +946,10 @@ contains
     class(gauss_legendre_field), intent(inout) :: self
     complex(dpc), intent(in) :: a
     class(gauss_legendre_field), intent(in) :: other
+    real(dp) :: ar
+    ar = real(a)
     call zaxpy(self%cdim,a,other%cdata,1,self%cdata,1)
-    call daxpy(self%rdim,real(a,kind=dp),other%rdata,1,self%rdata,1)
+    call daxpy(self%rdim,ar,other%rdata,1,self%rdata,1)
     return
   end subroutine saxpy_gauss_legendre_field
 
@@ -956,7 +960,7 @@ contains
     class(gauss_legendre_field), intent(in) :: other
     complex(dpc) :: ac
     ac = a
-    call zaxpy(self%cdim,ac,other%rdata,1,self%rdata,1)
+    call zaxpy(self%cdim,ac,other%cdata,1,self%cdata,1)
     call daxpy(self%rdim,a,other%rdata,1,self%rdata,1)
     return
   end subroutine real_saxpy_gauss_legendre_field
@@ -1378,7 +1382,7 @@ contains
     class(spherical_harmonic_expansion), intent(inout) :: self
     complex(dpc), intent(in) :: a
     call zscal(self%cdim,a,self%cdata,1)
-    call dscal(self%rdim,real(a,kind=dp),self%rdata,1)
+    call zscal(self%rdim,a,self%rdata,1)
     return
   end subroutine scale_spherical_harmonic_expansion
 
@@ -1386,8 +1390,10 @@ contains
     implicit none
     class(spherical_harmonic_expansion), intent(inout) :: self
     real(dp), intent(in) :: a
-    call zdscal(self%cdim,a,self%cdata,1)
-    call dscal(self%rdim,a,self%rdata,1)
+    complex(dpc) :: ac
+    ac = a
+    call zdscal(self%cdim,ac,self%cdata,1)
+    call zscal(self%rdim,ac,self%rdata,1)
     return
   end subroutine real_scale_spherical_harmonic_expansion
 
@@ -1397,7 +1403,7 @@ contains
     complex(dpc), intent(in) :: a
     class(spherical_harmonic_expansion), intent(in) :: other
     call zaxpy(self%cdim,a,other%cdata,1,self%cdata,1)
-    call daxpy(self%rdim,real(a,kind=dp),other%rdata,1,self%rdata,1)
+    call zaxpy(self%rdim,a,other%rdata,1,self%rdata,1)
     return
   end subroutine saxpy_spherical_harmonic_expansion
 
@@ -1409,7 +1415,7 @@ contains
     complex(dpc) :: ac
     ac = a
     call zaxpy(self%cdim,ac,other%cdata,1,self%cdata,1)
-    call daxpy(self%rdim,a,other%rdata,1,self%rdata,1)
+    call zaxpy(self%rdim,ac,other%rdata,1,self%rdata,1)
     return
   end subroutine real_saxpy_spherical_harmonic_expansion
 

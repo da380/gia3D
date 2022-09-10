@@ -194,41 +194,42 @@ contains
   end subroutine set_trapezoid_quadrature
   
   
-  subroutine set_gauss_quadrature(self,n,poly)
+  subroutine set_gauss_quadrature(self,n)
     use module_special_functions
     implicit none    
     class(gauss_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    class(orthogonal_polynomial), intent(in) :: poly
     call self%allocate(n)    
-    self%a = poly%xl()
-    self%b = poly%xr()
-    call build_gauss_quadrature(poly,n,self%x,self%w)
+    self%a = -1.0_dp
+    self%b =  1.0_dp
+    call build_gauss_quadrature(n,self%x,self%w)
     return
   end subroutine set_gauss_quadrature
 
-  subroutine build_gauss_quadrature(poly,n,x,w)
+  subroutine build_gauss_quadrature(n,x,w)
     use module_special_functions
     implicit none
-    class(orthogonal_polynomial), intent(in) :: poly
     integer(i4b), intent(in) :: n
     real(dp), dimension(n), intent(out) :: x,w
 
     integer(i4b) :: il,iu,abstol,m,ldz,lwork,liwork,info,i
     integer(i4b), dimension(10*n) :: iwork
     integer(i4b), dimension(2*n) :: isuppz
-    real(dp) :: vl,vu
+    real(dp) :: vl,vu,ix
     real(dp), dimension(n) :: alpha,beta
     real(dp), dimension(18*n) :: work
     real(dp), dimension(n,n) :: z
 
 
+    
     ! set up the matrix
     do i = 1,n
-       alpha(i) = -poly%b(i)/poly%a(i)
-       beta(i)  = poly%c(i+1)/(poly%a(i)*poly%a(i+1))
-       beta(i)  = sqrt(beta(i))       
+       ix = i
+       alpha(i) = 0.0_dp
+       beta(i)  = ix*ix/((2*ix-1)*(2*ix+1))
+       beta(i)  = sqrt(beta(i))
     end do
+
     
     ! solve the eigenvalue problem
     lwork  = 18*n
@@ -237,32 +238,31 @@ contains
                  m,x,z,n,isuppz,work,lwork,iwork,liwork,info)		
 
     ! get the weights
-    w = poly%mu0()*z(1,:)**2
+    w = 2.0_dp*z(1,:)**2
+
     
     return
   end subroutine build_gauss_quadrature
 
 
-  subroutine set_gauss_radau_quadrature(self,n,poly,right)
+  subroutine set_gauss_radau_quadrature(self,n,right)
     use module_error
     use module_special_functions
     implicit none    
     class(gauss_radau_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    class(orthogonal_polynomial), intent(in) :: poly
     logical, intent(in), optional :: right
     call error(n < 2,'set_gauss_radau_quadrature','order must be at least 2')
     call self%allocate(n)
-    self%a = poly%xl()
-    self%b = poly%xr()    
-    call build_gauss_radau_quadrature(poly,n-1,self%x,self%w,right)
+    self%a = -1.0_dp
+    self%b =  1.0_dp    
+    call build_gauss_radau_quadrature(n-1,self%x,self%w,right)
     return
   end subroutine set_gauss_radau_quadrature
   
-  subroutine build_gauss_radau_quadrature(poly,n,x,w,right)
+  subroutine build_gauss_radau_quadrature(n,x,w,right)
     use module_special_functions
     implicit none
-    class(orthogonal_polynomial), intent(in) :: poly
     integer(i4b), intent(in) :: n
     real(dp), dimension(n+1), intent(out) :: x,w
     logical, intent(in), optional :: right
@@ -271,18 +271,22 @@ contains
     integer(i4b) :: il,iu,abstol,m,ldz,lwork,liwork,info,i
     integer(i4b), dimension(10*(n+1)) :: iwork
     integer(i4b), dimension(2*(n+1)) :: isuppz
-    real(dp) :: vl,vu
+    real(dp) :: vl,vu,ix,x1,x2
     real(dp), dimension(n) :: alpha,beta
     real(dp), dimension(n+1) :: d,e
     real(dp), dimension(n,1) :: b
     real(dp), dimension(18*(n+1)) :: work
     real(dp), dimension(n+1,n+1) :: z
-     
+
+    x1 = -1.0_dp
+    x2 =  1.0_dp
+    
     ! set up the matrix
     do i = 1,n
-       alpha(i) = -poly%b(i)/poly%a(i)
-       beta(i)  = poly%c(i+1)/(poly%a(i)*poly%a(i+1))
-       beta(i)  = sqrt(beta(i))       
+       ix = i
+       alpha(i) = 0.0_dp
+       beta(i)  = ix*ix/((2*ix-1)*(2*ix+1))
+       beta(i)  = sqrt(beta(i))
     end do
 
     
@@ -294,12 +298,12 @@ contains
 
     ! set up the linear system to be solved
     if(do_right) then       
-       d(1:n)   = poly%xr()-alpha(1:n)
+       d(1:n)   = x2-alpha(1:n)
        e(1:n-1) = -beta(1:n-1)
        b = 0.0_dp
        b(n,1) = -beta(n)**2
     else
-       d(1:n)   = alpha(1:n)-poly%xl()
+       d(1:n)   = alpha(1:n)-x1
        e(1:n-1) = beta(1:n-1)
        b = 0.0_dp
        b(n,1) = beta(n)**2
@@ -311,9 +315,9 @@ contains
     ! set up the matrix for the eigenvalue problem
     d(1:n) = alpha
     if(do_right) then
-       d(n+1) = poly%xr() + b(n,1)
+       d(n+1) = x2 + b(n,1)
     else
-       d(n+1) = poly%xl() + b(n,1)
+       d(n+1) = x1 + b(n,1)
     end if
     e(1:n) = beta
     e(n+1) = 0.0_dp
@@ -325,33 +329,37 @@ contains
                  m,x,z,n+1,isuppz,work,lwork,iwork,liwork,info)		
 
     ! get the weights
-    w = poly%mu0()*z(1,:)**2
+    w = 2.0_dp*z(1,:)**2
+
+    if(do_right) then
+       x(n+1) = 1.0_dp
+    else
+       x(1)  = -1.0_dp
+    end if
     
     return
   end subroutine build_gauss_radau_quadrature
 
 
-  subroutine set_gauss_lobatto_quadrature(self,n,poly)
+  subroutine set_gauss_lobatto_quadrature(self,n)
     use module_error
     use module_special_functions
     implicit none    
     class(gauss_lobatto_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    class(orthogonal_polynomial), intent(in) :: poly
     call error(n < 2,'set_gauss_lobatto_quadrature','order must be at least 2')
     call self%allocate(n)
-    self%a = poly%xl()
-    self%b = poly%xr()  
-    call build_gauss_lobatto_quadrature(poly,n-1,self%x,self%w)
+    self%a = -1.0_dp
+    self%b =  1.0_dp  
+    call build_gauss_lobatto_quadrature(n-1,self%x,self%w)
     return
   end subroutine set_gauss_lobatto_quadrature
   
 
 
-  subroutine build_gauss_lobatto_quadrature(poly,n,x,w)
+  subroutine build_gauss_lobatto_quadrature(n,x,w)
     use module_special_functions
     implicit none
-    class(orthogonal_polynomial), intent(in) :: poly
     integer(i4b), intent(in) :: n
     real(dp), dimension(n+1), intent(out) :: x,w
 
@@ -359,7 +367,7 @@ contains
     integer(i4b) :: il,iu,abstol,m,ldz,lwork,liwork,info,i
     integer(i4b), dimension(10*(n+1)) :: iwork
     integer(i4b), dimension(2*(n+1)) :: isuppz
-    real(dp) :: vl,vu,gamma,mu,x1,x2,mu0
+    real(dp) :: vl,vu,gamma,mu,x1,x2,mu0,ix
     real(dp), dimension(n) :: alpha,beta
     real(dp), dimension(n+1) :: d,e
     real(dp), dimension(n,1) :: b
@@ -367,17 +375,18 @@ contains
     real(dp), dimension(n+1,n+1) :: z
 
     ! get end points
-    x1 = poly%xl()
-    x2 = poly%xr()
+    x1 = -1.0_dp
+    x2 =  1.0_dp
 
     ! first moment
-    mu0 = poly%mu0()
+    mu0 = 2.0_dp
     
     ! set up the matrix
     do i = 1,n
-       alpha(i) = -poly%b(i)/poly%a(i)
-       beta(i)  = poly%c(i+1)/(poly%a(i)*poly%a(i+1))
-       beta(i)  = sqrt(beta(i))       
+       ix = i
+       alpha(i) = 0.0_dp
+       beta(i)  = ix*ix/((2*ix-1)*(2*ix+1))
+       beta(i)  = sqrt(beta(i))
     end do
 
     ! set up and solve the first linear system

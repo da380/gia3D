@@ -15,11 +15,11 @@ program test_spherical_model
   type(spherical_section) :: in,upper,lower
   type(spherical_model) :: model
 
-
   
   model = elastic_PREM(.false.)
   call model%write_elastic('prem.out',200)
-
+  model = elastic_DECK('prem.out')
+  call model%write_elastic('prem2.out',200)
 
 
   
