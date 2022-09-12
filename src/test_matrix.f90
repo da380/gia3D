@@ -15,15 +15,18 @@ program test_matrix
   type(spherical_model), allocatable :: model
   type(spherical_model_mesh) :: mesh
   type(boolean_array) :: ibool
-  type(radial_matrix) :: tormat
+  type(radial_matrix) :: tormat,sphmat
   
   model = elastic_PREM(.false.)
   drmax = model%r2/100.0_dp
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
 
-  l = 1
+  l = 2
   tormat = build_toroidal_matrix(mesh,l)
+
+  l = 2
+  sphmat = build_spheroidal_matrix(mesh,l)
   
   
   

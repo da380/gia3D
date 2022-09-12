@@ -16,7 +16,7 @@ program test_mesh
   type(boolean_array) :: ibool
   
   
-  model = elastic_PREM()
+  model = elastic_PREM(.false.)
   drmax = model%r2/100.0_dp
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
