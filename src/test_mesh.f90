@@ -4,7 +4,8 @@ program test_mesh
   use module_spherical_model
   use module_PREM
   use module_DECK
-  use module_meshing
+  use module_mesh
+  use module_SEM_matrix
   use module_special_functions
   implicit none
 
@@ -15,22 +16,20 @@ program test_mesh
   type(boolean_array) :: ibool
   
   
-  model = elastic_PREM(.false.)
+  model = elastic_PREM()
   drmax = model%r2/100.0_dp
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
 
-  rstart = 0.6*mesh%r2
-  !  ibool = build_boolean_spheroidal(mesh,rstart)
-  ibool = build_boolean_toroidal(mesh,rstart)  
+  rstart = 0.0*mesh%r2
+  ibool = build_boolean_spheroidal(mesh,rstart)
+!  ibool = build_boolean_toroidal(mesh,rstart)  
   ndim = ibool%ndim
 
   
   count = 0
   do isection = ibool%isection1,mesh%nsections
 
-     
-     
      associate(ibool => ibool%section(isection), &
                section => mesh%section(isection))
 
@@ -50,11 +49,11 @@ program test_mesh
 
                   class is(spherical_solid_elastic_layer_mesh)
                      
-!                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec), &
-!                                                          ibool%get(2,inode,ispec), &
-!                                                          ibool%get(3,inode,ispec)
+                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec), &
+                                                          ibool%get(2,inode,ispec), &
+                                                          ibool%get(3,inode,ispec)
 
-                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
+  !                   print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
                      
                   class is(spherical_fluid_elastic_layer_mesh)
 
