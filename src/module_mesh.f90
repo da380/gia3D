@@ -1,7 +1,7 @@
 module module_mesh
 
   use module_constants
-  use module_physical_constants
+  use module_physical_constants, only : bigg
   use module_spherical_model
   use module_quadrature
   use module_special_functions

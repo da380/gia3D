@@ -9,7 +9,7 @@ program test_mesh
   use module_special_functions
   implicit none
 
-  integer(i4b) :: ngll,nspec,inode,ispec,ilayer,nlayers,isection,i,count,ndim
+  integer(i4b) :: ngll,nspec,inode,ispec,ilayer,nlayers,isection,i,count,ndim,l
   real(dp) :: drmax,rstart
   type(spherical_model), allocatable :: model
   type(spherical_model_mesh) :: mesh
@@ -17,11 +17,13 @@ program test_mesh
   
   
   model = elastic_PREM(.false.)
-  drmax = model%r2/100.0_dp
+  l = 256
+  drmax = 0.01_dp*mesh%r2/(l+1)
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
 
-  rstart = 0.0*mesh%r2
+  l = 2
+  rstart = spheroidal_start(mesh,l)
   ibool = build_boolean_spheroidal(mesh,rstart)
 !  ibool = build_boolean_toroidal(mesh,rstart)  
   ndim = ibool%ndim

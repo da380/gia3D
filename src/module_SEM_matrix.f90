@@ -10,10 +10,12 @@ module module_SEM_matrix
   type radial_matrix
      logical :: factorised  = .false.
      integer(i4b) :: l
+     integer(i4b) :: ndim
+     integer(i4b) :: kd
+     integer(i4b) :: ldab
      type(boolean_array) :: ibool
      real(dp), dimension(:,:), allocatable :: a
   end type radial_matrix
-
 
   
 contains
@@ -210,14 +212,15 @@ contains
     if(l == 1) mat%ibool%ndim = mat%ibool%ndim-1
     ndim = mat%ibool%ndim
     kd = mat%ibool%ngll-1
-    ldab = kd+1
+    ldab = kd+1    
+    mat%ndim = ndim
+    mat%kd = kd
+    mat%ldab = ldab
     if(allocated(mat%a)) deallocate(mat%a); allocate(mat%a(ldab,ndim))
     mat%a = 0.0_dp
     do isection = mat%ibool%isection1,mesh%nsections
-       spectop = (l == 1) .and. (isection == mesh%nsections)
        do ilayer = mat%ibool%section(isection)%ilayer1,mesh%section(isection)%nlayers
-          spectop = spectop .and. (ilayer == mesh%section(isection)%nlayers)
-          associate(layer => mesh%section(isection)%layer(ilayer),       &
+          associate(layer => mesh%section(isection)%layer(ilayer),      &
                     ibool => mat%ibool%section(isection)%layer(ilayer), &
                     a => mat%a)
             select type(layer)               
@@ -230,7 +233,10 @@ contains
                     r     => layer%r,      &
                     mu    => layer%mu)
                  do ispec = ibool%ispec1,nspec
-                    spectop = spectop .and. (ispec == nspec)
+                    spectop = (l == 1) .and. &
+                              (isection == mesh%nsections) .and.  & 
+                              (ilayer == mesh%section(isection)%nlayers) .and. &
+                              (ispec == nspec)
                     do inode = 1,ngll
                        ibnd = spectop .and. (inode == ngll)
                        if(ibnd) cycle
@@ -276,7 +282,7 @@ contains
     type(spherical_model_mesh), intent(in) :: mesh
     integer(i4b), intent(in) :: l
     real(dp), intent(in), optional :: eps_in
-    real(dp), parameter :: eps_def = 1.0e-8_dp
+    real(dp), parameter :: eps_def = 1.0e-7_dp
     real(dp) :: eps
     if(present(eps_in)) then
        eps = eps_in
@@ -299,7 +305,7 @@ contains
 
     logical :: fluid
     integer(i4b) :: isection1,isection,nsections,ilayer,ilayer1,nlayers, &
-                    ngll,nspec,ispec,ispec1,inode,count,ngllm
+                    ngll,nspec,ispec,ispec1,inode,count,ngllm,ndim
     real(dp) :: r1,r2,rs
     
     r1 = mesh%r1
@@ -383,6 +389,7 @@ contains
     fluid = .false.
     count = 0
     ngllm = 0
+    ndim = 0
     do isection = isection1,nsections
 
        ilayer1 = ibool%section(isection)%ilayer1
@@ -446,10 +453,19 @@ contains
           end associate
           
        end do
-       
+
     end do
 
-    ibool%ndim = count+1
+    ! get the dimension of the system
+    associate(layer => mesh%section(mesh%nsections)%layer(1))
+      select type(layer)
+      class is(spherical_solid_elastic_layer_mesh)
+         ibool%ndim = count+3
+      class is(spherical_fluid_elastic_layer_mesh)
+         ibool%ndim = count+1
+      end select
+    end associate
+    ! store the largest spectral element order
     ibool%ngll = ngllm
     
     return
@@ -464,7 +480,7 @@ contains
     logical :: spectop,ibnd,jbnd,factor_local,centre
     integer(i4b) :: ndim,kd,ldab,isection,ilayer,inode,  &
                     ispec,jnode,knode,ngll,nspec,i,j,k,info,ispec1, &
-                    i1,i2,i3,j1,j2,j3,nlayers,ilayer1
+                    i1,i2,i3,j1,j2,j3,nlayers,ilayer1,isection1,nsections
     real(dp) :: tmp1,tmp2,zeta2,zeta2m2,zetac,ifpibigg,rt,mut,kapt,gt, &
                 rhot,drhot,fac
 
@@ -482,10 +498,14 @@ contains
     mat%ibool = build_boolean_spheroidal(mesh,spheroidal_start(mesh,l))
     if(l == 1) mat%ibool%ndim = mat%ibool%ndim-1
     ndim = mat%ibool%ndim
+    ngll = mat%ibool%ngll
     kd = 3*(ngll-1)+2
     ldab = kd+1
+    mat%ndim = ndim
+    mat%kd = kd
+    mat%ldab = ldab
     if(allocated(mat%a)) deallocate(mat%a); allocate(mat%a(ldab,ndim))
-    mat%a = 0.0_dp    
+    mat%a = 0.0_dp
 
     centre = (mesh%r1 == 0.0_dp) .and. (mat%ibool%isection1 == 1)
     if(centre) then
@@ -494,38 +514,37 @@ contains
           centre = centre .and. (mat%ibool%section(1)%layer(1)%ispec1 == 1)
        end if
     end if
-     
+
+
+    
     if(.not.centre) then
        isection = mat%ibool%isection1
        ilayer = mat%ibool%section(isection)%ilayer1
-       ispec = mat%ibool%section(isection)%layer(ilayer)%ispec1
-       rt = mesh%section(isection)%layer(ilayer)%r1
        associate(layer => mesh%section(isection)%layer(ilayer), &
                  ibool => mat%ibool%section(isection)%layer(ilayer), &
-                 a => mat%a)         
+                 a => mat%a)
+         ispec = ibool%ispec1
+         rt = layer%r(1,ispec)
          select type(layer)
          class is(spherical_solid_elastic_layer_mesh)
             i = ibool%get(3,1,ispec)
-            j = i
          class is(spherical_fluid_elastic_layer_mesh)
             i = ibool%get(1,1,ispec)
-            j = i
          class default
             stop 'build_spheroidal_mesh: invalid mesh'            
          end select
-         k = kd+1+i-j
-         a(k,j) = a(k,j) + l*ifpibigg*rt
+         k = kd+1
+         a(k,i) = a(k,i) + l*ifpibigg*rt
        end associate
     end if
+
     
-    
-    do isection = mat%ibool%isection1,mesh%nsections
-       spectop = (l == 1) .and. (isection == mesh%nsections)
+    isection1 = mat%ibool%isection1
+    nsections = mesh%nsections
+    do isection = isection1,nsections
        ilayer1 = mat%ibool%section(isection)%ilayer1
        nlayers = mesh%section(isection)%nlayers
        do ilayer = ilayer1,nlayers
-          spectop = spectop .and. (ilayer == nlayers)
-
           associate(layer => mesh%section(isection)%layer(ilayer),      &
                     ibool => mat%ibool%section(isection)%layer(ilayer), &
                     a => mat%a)
@@ -533,7 +552,7 @@ contains
             ngll  = layer%ngll
             nspec = layer%nspec
             ispec1 = ibool%ispec1
-            
+
             select type(layer)
                
             class is(spherical_solid_elastic_layer_mesh)
@@ -548,9 +567,15 @@ contains
                          w     => layer%w)
                  
                  do ispec = ispec1,nspec
-                    spectop = spectop .and. (ispec == nspec)
+                    spectop = (l == 1) .and. &
+                              (isection == mesh%nsections) .and.  & 
+                              (ilayer == mesh%section(isection)%nlayers) .and. &
+                              (ispec == nspec)
+                    
                     do inode = 1,ngll
                        ibnd = spectop .and. (inode == ngll)
+
+
 
                        rhot =   rho(inode,ispec)
                        mut  =    mu(inode,ispec)
@@ -568,29 +593,41 @@ contains
                        j = ibool%get(2,inode,ispec)
                        k = kd+1+i-j
                        a(k,j) = a(k,j) + zeta2*rhot*gt*rt*w(inode)*jac(ispec)
-
+                       
                        ! v-v'
                        i = ibool%get(2,inode,ispec)
                        j = ibool%get(2,inode,ispec)
                        k = kd+1+i-j
                        a(k,j) = a(k,j) + zeta2*(zeta2*kapt+zetac*mut)*w(inode)*jac(ispec)
-                       
+
                        
                        if(.not. ibnd) then
+
+                          ! v-phi'
+                          i = ibool%get(2,inode,ispec)
+                          j = ibool%get(3,inode,ispec)
+                          if(j >= i) then
+                             k = kd+1+i-j
+                             a(k,j) = a(k,j) + zeta2*rhot*rt*w(inode)*jac(ispec)
+                          end if
+
                           ! phi-v'
                           i = ibool%get(3,inode,ispec)
                           j = ibool%get(2,inode,ispec)
-                          if(i <= j) then
+                          if(j >= i) then
                              k = kd+1+i-j
                              a(k,j) = a(k,j) + zeta2*rhot*rt*w(inode)*jac(ispec)
-                          end if                          
+                          end if
+                          
                           ! phi-phi'
                           i = ibool%get(3,inode,ispec)
                           j = i
                           k = kd+1+i-j
                           a(k,j) = a(k,j) + ifpibigg*zeta2*w(inode)*jac(ispec)
+                          
                        end if
 
+                       
                           
                        do jnode = inode,ngll                          
                           jbnd = spectop .and. (jnode == ngll)
@@ -641,31 +678,18 @@ contains
                           if(.not.jbnd) then
                              i = ibool%get(1,inode,ispec)
                              j = ibool%get(3,jnode,ispec)
-                             k = kd+1+i-j
-                             rt = r(inode,ispec)
-                             rhot = rho(inode,ispec)
-                             a(k,j) = a(k,j) + rhot*rt*rt*hp(inode,jnode)*w(inode)
+                             if(j >= i) then
+                                k = kd+1+i-j
+                                rt = r(inode,ispec)
+                                rhot = rho(inode,ispec)
+                                a(k,j) = a(k,j) + rhot*rt*rt*hp(inode,jnode)*w(inode)
+                             end if
                           end if
-
-                          ! v-v'
-                          i = ibool%get(2,inode,ispec)
-                          j = ibool%get(2,jnode,ispec)
-                          k = kd+1+i-j
-                          do knode = 1,ngll
-                             rt  = r(knode,ispec)
-                             mut = mu(knode,ispec)                
-                             tmp1 = rt*hp(knode,inode)/jac(ispec)
-                             if(knode == inode) tmp1 = tmp1-1.0_dp
-                             tmp2 = rt*hp(knode,jnode)/jac(ispec)
-                             if(knode == jnode) tmp2 = tmp2-1.0_dp          
-                             a(k,j) = a(k,j) + zeta2*mut*tmp1*tmp2*w(knode)*jac(ispec)
-                          end do
-
 
                           ! v-u'
                           i = ibool%get(2,inode,ispec)
                           j = ibool%get(1,jnode,ispec)
-                          if(i <= j) then
+                          if(j >= i) then
                              k = kd+1+i-j
                              kapt = kappa(inode,ispec)
                              rt = r(inode,ispec) 
@@ -682,12 +706,28 @@ contains
                              if(inode == jnode) tmp1 = tmp1-1.0_dp
                              a(k,j) = a(k,j) + zeta2*mut*tmp1*w(jnode)*jac(ispec)
                           end if
+
+                          
+                          ! v-v'
+                          i = ibool%get(2,inode,ispec)
+                          j = ibool%get(2,jnode,ispec)
+                          k = kd+1+i-j
+                          do knode = 1,ngll
+                             rt  = r(knode,ispec)
+                             mut = mu(knode,ispec)                
+                             tmp1 = rt*hp(knode,inode)/jac(ispec)
+                             if(knode == inode) tmp1 = tmp1-1.0_dp
+                             tmp2 = rt*hp(knode,jnode)/jac(ispec)
+                             if(knode == jnode) tmp2 = tmp2-1.0_dp          
+                             a(k,j) = a(k,j) + zeta2*mut*tmp1*tmp2*w(knode)*jac(ispec)
+                          end do
+
                           
                           ! phi-u'
                           if(.not.ibnd) then
                              i = ibool%get(3,inode,ispec)
                              j = ibool%get(1,jnode,ispec)
-                             if(i <= j) then
+                             if(j >= i) then
                                 k = kd+1+i-j
                                 rt = r(jnode,ispec)
                                 rhot = rho(jnode,ispec)
@@ -803,7 +843,7 @@ contains
                     ! u-phi'
                     i = ibool%get(1,ngll,nspec)
                     j = ibool%get(3,ngll,nspec)
-                    k = kd+1+i-j
+                    k = kd+1+i-j                    
                     a(k,j) = a(k,j) - rt*rt*rhot
                   end associate
                end select
@@ -821,9 +861,9 @@ contains
                     j = i
                     k = kd+1+i-j
                     a(k,j) = a(k,j) + rt*rt*gt*rhot
-                    ! u-phi'
-                    i = ibool%get(1,1,1)
-                    j = ibool%get(3,1,1)
+                    ! phi-u'
+                    i = ibool%get(3,1,1)
+                    j = ibool%get(1,1,1)
                     k = kd+1+i-j
                     a(k,j) = a(k,j) + rt*rt*rhot
                   end associate
@@ -838,11 +878,11 @@ contains
        
     end do
 
-
+    
     ! add in DNT terms
     if(l > 1) then
        isection = mesh%nsections
-       ilayer = mesh%section(ilayer)%nlayers
+       ilayer = mesh%section(isection)%nlayers
        associate(layer => mesh%section(isection)%layer(ilayer),      &
                  ibool => mat%ibool%section(isection)%layer(ilayer), &
                  a => mat%a)
@@ -858,7 +898,7 @@ contains
          end select
        end associate
     end if
-    
+
 
     if(factor_local) then
        call dpbtrf('U',ndim,kd,mat%a,ldab,info)
@@ -874,7 +914,7 @@ contains
     type(spherical_model_mesh), intent(in) :: mesh
     integer(i4b), intent(in) :: l
     real(dp), intent(in), optional :: eps_in
-    real(dp), parameter :: eps_def = 1.0e-8_dp
+    real(dp), parameter :: eps_def = 1.0e-7_dp
     real(dp) :: eps
     if(present(eps_in)) then
        eps = eps_in
