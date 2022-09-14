@@ -5,8 +5,7 @@ program test_matrix
   use module_PREM
   use module_DECK
   use module_mesh
-  use module_SEM_matrix
-  use module_special_functions
+  use module_matrix
   implicit none
 
   logical :: spectop,ibnd
@@ -19,12 +18,13 @@ program test_matrix
   type(boolean_array) :: ibool
   type(radial_matrix) :: tormat,sphmat
   real(dp), dimension(:,:), allocatable :: b
-
-
+  type(boolean_array) :: bool
+  
+  
   model = elastic_PREM(.false.)
   
-  l = 256
-  drmax = 0.01_dp*mesh%r2/(l+1)
+  l = 512
+  drmax = 0.1_dp*model%r2/(l+1)
   ngll = 5
   mesh = spherical_mesh(ngll,model,drmax)
 

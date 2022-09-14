@@ -102,7 +102,7 @@ contains
     character(len=*), intent(in) :: file
     type(spherical_model) :: model
 
-    logical :: isotropic,change
+    logical :: isotropic,change,file_exists
     integer(i4b) :: io,iknot,nknot,ios,ncol,isec,i1,i2,ilay,i11,i22
     integer(i4b), dimension(:,:), allocatable :: sind
     real(dp) :: tmp
@@ -111,6 +111,8 @@ contains
     !------------------------------------!
     !           read in the file         !
     !------------------------------------!
+    inquire(file = trim(file),exist = file_exists)
+    if(.not.file_exists) stop 'elastic_DECK: model file does not exist'    
     open(newunit = io,file = trim(file),iostat = ios)
     if(ios /= 0) stop 'elastic_DECK: problem opening model file'
     ncol = count_columns(io)
@@ -353,7 +355,7 @@ contains
     character(len=*), intent(in) :: file
     type(spherical_model) :: model
 
-    logical :: isotropic,change,viscous,fluid
+    logical :: isotropic,change,viscous,fluid,file_exists
     integer(i4b) :: io,iknot,nknot,ios,ncol,isec,i1,i2,ilay,i11,i22
     integer(i4b), dimension(:,:), allocatable :: sind
     real(dp) :: tmp
@@ -362,6 +364,8 @@ contains
     !------------------------------------!
     !           read in the file         !
     !------------------------------------!
+    inquire(file = trim(file),exist = file_exists)
+    if(.not.file_exists) stop 'elastic_DECK: model file does not exist'    
     open(newunit = io,file = trim(file),iostat = ios)
     if(ios /= 0) stop 'maxwell_DECK: problem opening model file'
     ncol = count_columns(io)
@@ -631,7 +635,7 @@ contains
     character(len=*), intent(in) :: file
     type(spherical_model) :: model
 
-    logical :: isotropic,change,qisotropic
+    logical :: isotropic,change,qisotropic,file_exists
     integer(i4b) :: io,iknot,nknot,ios,ncol,isec,i1,i2,ilay,i11,i22
     integer(i4b), dimension(:,:), allocatable :: sind
     real(dp) :: tmp,qk,qm,k,m,a,c,f,l,n
@@ -641,6 +645,8 @@ contains
     !------------------------------------!
     !           read in the file         !
     !------------------------------------!
+    inquire(file = trim(file),exist = file_exists)
+    if(.not.file_exists) stop 'elastic_DECK: model file does not exist'    
     open(newunit = io,file = trim(file),iostat = ios)
     if(ios /= 0) stop 'anelastic_DECK: problem opening model file'
     ncol = count_columns(io)

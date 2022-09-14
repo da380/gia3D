@@ -7,7 +7,7 @@ module module_mesh
   use module_special_functions
   implicit none
 
-
+  
   type spherical_model_mesh
      integer(i4b) :: nsections
      real(dp) :: r1

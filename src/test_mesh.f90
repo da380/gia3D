@@ -5,7 +5,7 @@ program test_mesh
   use module_PREM
   use module_DECK
   use module_mesh
-  use module_SEM_matrix
+  use module_matrix
   use module_special_functions
   implicit none
 
@@ -18,7 +18,7 @@ program test_mesh
   
   model = elastic_PREM(.false.)
   l = 256
-  drmax = 0.01_dp*mesh%r2/(l+1)
+  drmax = 0.1_dp*model%r2/(l+1)
   ngll = 5 
   mesh = spherical_mesh(ngll,model,drmax)
 

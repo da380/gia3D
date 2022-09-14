@@ -18,6 +18,7 @@ module module_physical_constants
   real(dp), parameter :: modulus_norm = mass_norm/(time_norm**2*length_norm)
   real(dp), parameter :: viscosity_norm = mass_norm/(time_norm*length_norm)
   real(dp), parameter :: action_norm = length_norm**2*mass_norm/time_norm
+  real(dp), parameter :: load_norm = mass_norm/(length_norm**2)
   
   ! values for some useful physical constants in SI units
   real(dp), parameter :: bigg = 6.6743e-11_dp/gravitational_constant_norm

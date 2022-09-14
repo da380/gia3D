@@ -1,4 +1,4 @@
-module module_SEM_matrix
+module module_matrix
 
   use module_constants
   use module_error
@@ -6,6 +6,8 @@ module module_SEM_matrix
   use module_physical_constants, only : bigg
   implicit none
 
+  ! small ratio for determining starting depths
+  real(dp), parameter :: eps_def  = 1.0e-6_dp
   
   type radial_matrix
      logical :: factorised  = .false.
@@ -133,7 +135,7 @@ contains
     end associate
     ibool%section(isection1)%layer(ilayer1)%ispec1 = ispec1
     nlayers = mesh%section(isection1)%nlayers
-    do ilayer = ilayer+1,nlayers
+    do ilayer = ilayer1+1,nlayers
        ibool%section(isection1)%layer(ilayer)%ispec1 = 1       
     end do
     do isection = isection1 + 1,nsections
@@ -282,7 +284,6 @@ contains
     type(spherical_model_mesh), intent(in) :: mesh
     integer(i4b), intent(in) :: l
     real(dp), intent(in), optional :: eps_in
-    real(dp), parameter :: eps_def = 1.0e-7_dp
     real(dp) :: eps
     if(present(eps_in)) then
        eps = eps_in
@@ -373,7 +374,7 @@ contains
     end associate
     ibool%section(isection1)%layer(ilayer1)%ispec1 = ispec1
     nlayers = mesh%section(isection1)%nlayers
-    do ilayer = ilayer+1,nlayers
+    do ilayer = ilayer1+1,nlayers
        ibool%section(isection1)%layer(ilayer)%ispec1 = 1       
     end do
     do isection = isection1 + 1,nsections
@@ -914,7 +915,6 @@ contains
     type(spherical_model_mesh), intent(in) :: mesh
     integer(i4b), intent(in) :: l
     real(dp), intent(in), optional :: eps_in
-    real(dp), parameter :: eps_def = 1.0e-7_dp
     real(dp) :: eps
     if(present(eps_in)) then
        eps = eps_in
@@ -928,5 +928,5 @@ contains
 
 
   
-end module module_SEM_matrix
+end module module_matrix
 
