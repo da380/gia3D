@@ -9,11 +9,11 @@ module module_util
   end interface count_columns
 
 
-  interface read_command_argument
-     procedure :: read_command_argument_character, &
-                  read_command_argument_integer,   &
-                  read_command_argument_real 
-  end interface read_command_argument
+  interface found_command_argument
+     procedure :: found_command_argument_character, &
+                  found_command_argument_integer,   &
+                  found_command_argument_real 
+  end interface found_command_argument
   
 contains
 
@@ -158,14 +158,14 @@ contains
     character(len=:), allocatable :: line
     integer, parameter :: buf_len= 1024*4
     character(len=buf_len) :: buf
-    logical :: OK, set
+    logical :: okay, set
     integer status, size    
-    OK = .false.
+    okay = .false.
     set = .true.
     do
        read (io,'(a)',advance='NO',iostat=status, size=size) buf
-       OK = .not. IS_IOSTAT_END(status)
-       if (.not. OK) return
+       okay = .not. IS_IOSTAT_END(status)
+       if (.not. okay) return
        if (set) then
           line = buf(1:size)
           set=.false.
@@ -181,17 +181,42 @@ contains
   !             command line routines            !
   !==============================================!
 
-
-
-  subroutine read_command_argument_character(tag,found,val)
+  subroutine check_arguments(narg,larg,nopt,lopt) 
+    integer(i4b), intent(in) :: narg    
+    character(len=*) :: larg
+    integer(i4b), intent(in), optional :: nopt
+    character(len=*), intent(in), optional :: lopt
+    character(len=:), allocatable :: loptl
+    integer(i4b) :: n,noptl
+    logical :: okay
+    if(present(nopt) .and. present(lopt)) then
+       noptl = nopt
+       loptl = lopt
+    else
+       noptl = 0
+       loptl = ''
+    end if
+    n = command_argument_count()
+    okay = (n  >= 2*narg) .and. (n <= 2*(narg+noptl))
+    if(.not.okay) then
+       print *, 'Missing inputs'
+       print *, 'Required: ',larg
+       if(noptl > 0) then
+          print *, 'Optional: ', lopt
+       end if
+       stop
+    end if
+    return
+  end subroutine check_arguments
+  
+  logical function found_command_argument_character(tag,val) result(found)
     character(len=*), intent(in) :: tag
-    logical, intent(out) :: found
     character(len=:), allocatable, intent(out) :: val
     character(len=1028) :: rtag,string
     integer(i4b) :: narg,iarg,jarg    
     narg = command_argument_count()
     if(mod(narg,2) /= 0) then
-       stop 'read_command_argument: number of arguments needs to be divisible by two'
+       stop 'found_command_argument: number of arguments needs to be divisible by two'
     end if
     found = .false.
     do iarg = 1,narg/2
@@ -205,17 +230,16 @@ contains
        end if
     end do
     return
-  end subroutine read_command_argument_character
+  end function found_command_argument_character
 
-  subroutine read_command_argument_integer(tag,found,val)
+  logical function found_command_argument_integer(tag,val) result(found)
     character(len=*), intent(in) :: tag
-    logical, intent(out) :: found
     integer(i4b), intent(out) :: val
     character(len=1028) :: rtag,string
     integer(i4b) :: narg,iarg,jarg,ios
     narg = command_argument_count()
     if(mod(narg,2) /= 0) then
-       stop 'read_command_argument: number of arguments needs to be divisible by two'
+       stop 'found_command_argument: number of arguments needs to be divisible by two'
     end if
     found = .false.
     do iarg = 1,narg/2
@@ -234,18 +258,17 @@ contains
        end if
     end do
     return
-  end subroutine read_command_argument_integer
+  end function found_command_argument_integer
 
 
-  subroutine read_command_argument_real(tag,found,val)
+  logical function found_command_argument_real(tag,val) result(found)
     character(len=*), intent(in) :: tag
-    logical, intent(out) :: found
     real(dp), intent(out) :: val
     character(len=1028) :: rtag,string
     integer(i4b) :: narg,iarg,jarg,ios
     narg = command_argument_count()
     if(mod(narg,2) /= 0) then
-       stop 'read_command_argument: number of arguments needs to be divisible by two'
+       stop 'found_command_argument: number of arguments needs to be divisible by two'
     end if
     found = .false.
     do iarg = 1,narg/2
@@ -264,6 +287,8 @@ contains
        end if
     end do
     return
-  end subroutine read_command_argument_real
+  end function found_command_argument_real
+
+
   
 end module module_util

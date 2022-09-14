@@ -9,7 +9,6 @@ program load_love_numbers
   use module_matrix
   implicit none
 
-  logical :: found
   character(len=:), allocatable :: model_file,output_file
   integer(i4b) :: lmax,ngll,l,ndim,kd,ldab,isection, &
                   ilayer,ispec,inode,i,info,io
@@ -20,12 +19,10 @@ program load_love_numbers
   type(radial_matrix) :: tormat,sphmat
 
   ! get the inputs
-  call read_command_argument('-lmax',found,lmax)
-  if(.not.found) stop 'lmax not set'
-  call read_command_argument('-f',found,output_file)
-  if(.not.found) stop 'output file not set'
-  call read_command_argument('-m',found,model_file)
-  if(found) then
+  call check_arguments(2,'-lmax [lmax], -f [output file]',1,'-m [model file]')
+  if (.not. found_command_argument('-lmax',lmax)) stop 'lmax not set'
+  if (.not. found_command_argument('-f',output_file)) stop 'output file not set'
+  if(found_command_argument('-m',model_file)) then
      model = elastic_DECK(model_file)     
   else
      model = elastic_PREM(.false.)     
