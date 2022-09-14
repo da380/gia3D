@@ -75,7 +75,7 @@ program load_love_numbers
 
   ! loop over the degrees
   open(newunit = io,file=trim(output_file))
-  do l = 2,lmax
+  do l = 1,lmax
 
      ! build the matrix
      sphmat = build_spheroidal_matrix(mesh,l)
