@@ -38,7 +38,7 @@ SRCS = test_special_functions.f90    \
        test.f90                      \
        test_mesh.f90                 \
        test_matrix.f90               \
-       load_love_numbers.f90
+       load_love_numbers.f90         
 
 
 ###########################################################

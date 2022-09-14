@@ -1,6 +1,7 @@
 program load_love_numbers
  
   use module_constants
+  use module_util
   use module_spherical_model
   use module_PREM
   use module_DECK
@@ -8,66 +9,28 @@ program load_love_numbers
   use module_matrix
   implicit none
 
-  logical :: output_file_set = .false.
-  logical :: lmax_set = .false.
-  logical :: model_file_set = .false.
-  character(len=2) :: targ
-  character(len=256) :: arg,model_file,output_file
-  integer(i4b) :: narg,argstat,iarg,jarg,ios,lmax,ngll,l, &
-                  ndim,kd,ldab,isection,ilayer,ispec,inode, &
-                  i,info,io
+  logical :: found
+  character(len=:), allocatable :: model_file,output_file
+  integer(i4b) :: lmax,ngll,l,ndim,kd,ldab,isection, &
+                  ilayer,ispec,inode,i,info,io
   real(dp) :: drmax,u,v,p,g
   real(dp), dimension(:,:), allocatable :: b
   type(spherical_model), allocatable :: model
   type(spherical_model_mesh) :: mesh
   type(radial_matrix) :: tormat,sphmat
 
-  !  get the arguments from the command line     
-  narg = command_argument_count()
-
-  if(mod(narg,2) /= 0 .or. narg > 6) then
-     print *, '=================='
-     print *, 'invalid input'
-     print *, '------------------'
-     print *, 'required:'
-     print *, '-l maximum degree'
-     print *, '-f output file'
-     print *, '------------------'
-     print *, 'optional:'
-     print *, '-m model file'
-     print *, '=================='
-  end if
-
-  do iarg = 1,narg/2
-     jarg = 2*(iarg-1)+1
-     call get_command_argument(jarg,targ,status = argstat)
-     if(argstat /= 0) stop 'problem reading first argument type'
-     call get_command_argument(jarg+1,arg,status = argstat)
-     if(argstat /= 0) stop 'problem reading first argument'
-     select case(targ)
-     case ('-m')
-        model_file = trim(arg)
-        model_file_set = .true.
-     case('-l')
-        read(arg,*,iostat = ios) lmax
-        if(ios /= 0) stop 'problem reading maximum degree'
-        lmax_set = .true.
-     case('-f')
-        output_file = trim(arg)
-        output_file_set = .true.
-     end select
-  end do
-
-  if(.not.(lmax_set)) stop 'maximum degree not set'
-  if(.not.(output_file_set)) stop 'output file not set'
-
-  ! set the model
-  if(model_file_set) then
+  ! get the inputs
+  call read_command_argument('-lmax',found,lmax)
+  if(.not.found) stop 'lmax not set'
+  call read_command_argument('-f',found,output_file)
+  if(.not.found) stop 'output file not set'
+  call read_command_argument('-m',found,model_file)
+  if(found) then
      model = elastic_DECK(model_file)     
   else
      model = elastic_PREM(.false.)     
   end if
-
+  
   ! build the mesh
   drmax = 0.1_dp*model%r2/(lmax+1)
   ngll = 5
