@@ -12,7 +12,9 @@ module module_mesh
      integer(i4b) :: nsections
      real(dp) :: r1
      real(dp) :: r2
-     type(spherical_section_mesh), dimension(:), allocatable :: section     
+     type(spherical_section_mesh), dimension(:), allocatable :: section
+   contains
+     procedure :: print_summary => print_mesh_summary
   end type spherical_model_mesh
   
   type spherical_section_mesh
@@ -23,6 +25,8 @@ module module_mesh
   end type spherical_section_mesh
   
   type spherical_layer_mesh
+     logical :: bottom = .false.
+     logical :: top = .false.
      integer(i4b) :: ngll
      integer(i4b) :: nspec
      real(dp) :: r1
@@ -36,7 +40,11 @@ module module_mesh
   end type spherical_layer_mesh
 
 
-  type, extends(spherical_layer_mesh) ::  spherical_solid_elastic_layer_mesh     
+  type, extends(spherical_layer_mesh) ::  spherical_solid_elastic_layer_mesh
+     logical :: below_fluid = .false.
+     logical :: above_fluid = .false.
+     real(dp) :: below_fluid_density = 0.0_dp
+     real(dp) :: above_fluid_density = 0.0_dp
      real(dp), dimension(:,:), allocatable :: A
      real(dp), dimension(:,:), allocatable :: C
      real(dp), dimension(:,:), allocatable :: F
@@ -48,6 +56,8 @@ module module_mesh
 
 
   type, extends(spherical_layer_mesh) ::  spherical_fluid_elastic_layer_mesh
+     logical :: below_solid = .false.
+     logical :: above_solid = .false.
      real(dp), dimension(:,:), allocatable :: drho
      real(dp), dimension(:,:), allocatable :: kappa
   end type spherical_fluid_elastic_layer_mesh
@@ -117,6 +127,7 @@ contains
     real(dp), intent(in) :: drmax
     type(spherical_model_mesh) :: mesh
 
+    logical :: fluid
     integer(i4b) :: ilayer,nlayers,isection
     class(spherical_layer_mesh), allocatable :: mesh_tmp
 
@@ -218,10 +229,107 @@ contains
     end do
 
     call calculate_gravity(mesh)
+    
+    ! flag the top and bottom layers
+    mesh%section(1)%layer(1)%bottom = .true.
+    mesh%section(mesh%nsections)%layer(mesh%section(mesh%nsections)%nlayers)%top =  .true.
 
+
+    ! label solid-fluid and fluid-solid boundaries
+    do isection = 2,mesh%nsections       
+       associate(layer => mesh%section(isection)%layer(1), &
+                 blayer => mesh%section(isection-1)%layer(mesh%section(isection-1)%nlayers))
+
+         select type(layer)
+
+         class is(spherical_solid_elastic_layer_mesh)
+
+
+            
+            select type(blayer)
+               
+            class is(spherical_fluid_elastic_layer_mesh)
+
+               layer%below_fluid = .true.
+               blayer%above_solid = .true.
+               layer%below_fluid_density = blayer%rho(blayer%ngll,blayer%nspec)
+
+            end select
+            
+         class is(spherical_fluid_elastic_layer_mesh)
+
+            select type(blayer)
+
+            class is(spherical_solid_elastic_layer_mesh)
+
+               layer%below_solid = .true.
+               blayer%above_fluid = .true.
+               blayer%above_fluid_density = layer%rho(1,1)
+               
+            end select
+
+         end select
+         
+       end associate
+    end do
+
+    
+
+    
     return
   end function make_spherical_mesh
 
+
+  subroutine print_mesh_summary(mesh)
+    class(spherical_model_mesh), intent(in) :: mesh
+
+    integer(i4b) :: isection,ilayer,nsections,nlayers
+    do isection = 1,mesh%nsections
+
+       print *, '====================================='
+       print *, 'Section = ',isection
+       print *, '====================================='
+       
+       nlayers = mesh%section(isection)%nlayers
+       do ilayer = 1,nlayers
+          
+          associate(layer => mesh%section(isection)%layer(ilayer))
+
+            print *, ''
+            print *, 'Layer = ',ilayer
+            print *, 'Bottom = ',layer%bottom
+            print *, 'Top = ',layer%top
+
+            select type(layer)
+
+            class is(spherical_solid_elastic_layer_mesh)
+
+               print *, 'Solid layer '
+               print *, 'Fluid below = ',layer%below_fluid
+               print *, 'Fluid above = ',layer%above_fluid
+               if(layer%below_fluid) print *, 'Fluid density below = ', layer%below_fluid_density*density_norm
+               if(layer%above_fluid) print *, 'Fluid density above = ', layer%above_fluid_density*density_norm
+
+            class is(spherical_fluid_elastic_layer_mesh)
+
+               print *, 'Fluid layer'
+               print *, 'Solid below = ',layer%below_solid
+               print *, 'Solid above = ',layer%above_solid
+               
+            end select
+
+            
+            
+          end associate
+          
+       end do
+       print *, ''
+
+    end do
+
+    
+  end subroutine print_mesh_summary
+  
   
   function make_spherical_layer_mesh(ngll,layer,drmax) result(mesh)
     integer(i4b), intent(in) :: ngll

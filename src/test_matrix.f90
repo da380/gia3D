@@ -1,6 +1,7 @@
 program test_matrix
 
   use module_constants
+  use module_util
   use module_spherical_model
   use module_PREM
   use module_DECK
@@ -8,33 +9,33 @@ program test_matrix
   use module_matrix
   implicit none
 
-  logical :: spectop,ibnd
+  logical :: spectop,ibnd,found
   integer(i4b) :: ngll,nspec,inode,ispec,ilayer,nlayers, &
                   isection,i,count,ndim,l,isection1,ilayer1, &
-                  nsections,ispec1,ldab,kd,info,i1,i2,i3
-  real(dp) :: drmax,rstart
+                  nsections,ispec1,ldab,kd,info,i1,i2,i3,k,j
+  real(dp) :: drmax,rstart,tmp
   type(spherical_model), allocatable :: model
   type(spherical_model_mesh) :: mesh
   type(boolean_array) :: ibool
-  type(radial_matrix) :: tormat,sphmat
+  type(radial_matrix) :: tormat,sphmat,sphmat2
   real(dp), dimension(:,:), allocatable :: b
   type(boolean_array) :: bool
-  
+
+
+  call check_arguments(1,'-l [int > 0]')
+  if(.not. found_command_argument('-l',l) .or. l < 0) stop 'l not set'
   
   model = elastic_PREM(.false.)
-  
-  l = 512
   drmax = 0.1_dp*model%r2/(l+1)
   ngll = 5
   mesh = spherical_mesh(ngll,model,drmax)
 
-
+  
   !============================================================!
   !                       toroidal section                     !
   !============================================================!
   
   ! build the matrix
-  l = 512
   tormat = build_toroidal_matrix(mesh,l)
 
   ! set the RHS
@@ -88,12 +89,10 @@ program test_matrix
   !                      spheroidal section                    !
   !============================================================!
   
-  l = 1
   sphmat = build_spheroidal_matrix(mesh,l)
 
-  
   ! set the RHS
-  ndim = sphmat%ndim
+  ndim = sphmat%ndim  
   kd = sphmat%kd
   ldab = sphmat%ldab
   deallocate(b); allocate(b(ndim,1))

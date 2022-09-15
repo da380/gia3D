@@ -199,7 +199,6 @@ contains
     n = command_argument_count()
     okay = (n  >= 2*narg) .and. (n <= 2*(narg+noptl))
     if(.not.okay) then
-       print *, 'Missing inputs'
        print *, 'Required: ',larg
        if(noptl > 0) then
           print *, 'Optional: ', lopt
