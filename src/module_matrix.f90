@@ -3,7 +3,7 @@ module module_matrix
   use module_constants
   use module_error
   use module_mesh
-  use module_physical_constants, only : bigg
+  use module_physical_constants
   implicit none
 
   ! small ratio for determining starting depths

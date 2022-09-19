@@ -7,23 +7,6 @@ module module_mesh
   use module_special_functions
   implicit none
 
-  
-  type spherical_model_mesh
-     integer(i4b) :: nsections
-     real(dp) :: r1
-     real(dp) :: r2
-     type(spherical_section_mesh), dimension(:), allocatable :: section
-   contains
-     procedure :: print_summary => print_mesh_summary
-  end type spherical_model_mesh
-  
-  type spherical_section_mesh
-     integer(i4b) :: nlayers
-     real(dp) :: r1
-     real(dp) :: r2
-     class(spherical_layer_mesh), dimension(:), allocatable :: layer     
-  end type spherical_section_mesh
-  
   type spherical_layer_mesh
      logical :: bottom = .false.
      logical :: top = .false.
@@ -38,6 +21,26 @@ module module_mesh
      real(dp), dimension(:,:), allocatable :: rho
      real(dp), dimension(:,:), allocatable :: g
   end type spherical_layer_mesh
+  
+
+  type spherical_section_mesh
+     integer(i4b) :: nlayers
+     real(dp) :: r1
+     real(dp) :: r2
+     class(spherical_layer_mesh), dimension(:), allocatable :: layer     
+  end type spherical_section_mesh
+
+  
+  type spherical_model_mesh
+     integer(i4b) :: nsections
+     real(dp) :: r1
+     real(dp) :: r2
+     type(spherical_section_mesh), dimension(:), allocatable :: section
+   contains
+     procedure :: print_summary => print_mesh_summary
+  end type spherical_model_mesh
+  
+
 
 
   type, extends(spherical_layer_mesh) ::  spherical_solid_elastic_layer_mesh
@@ -84,6 +87,23 @@ module module_mesh
   end type spherical_maxwell_layer_mesh
 
 
+  type boolean_array_layer
+     integer(i4b) :: nvar
+     integer(i4b) :: ispec1
+     integer(i4b), dimension(:,:,:), allocatable :: data
+   contains
+     procedure :: get => get_boolean_array_layer
+  end type boolean_array_layer
+
+
+  type boolean_array_section
+     integer(i4b) :: ilayer1
+     type(boolean_array_layer), dimension(:), allocatable :: layer
+   contains
+     procedure :: get => get_boolean_array_section
+  end type boolean_array_section
+
+
   type boolean_array
      integer(i4b) :: ndim     
      integer(i4b) :: ngll
@@ -93,20 +113,6 @@ module module_mesh
      procedure :: get => get_boolean_array
   end type boolean_array
 
-  type boolean_array_section
-     integer(i4b) :: ilayer1
-     type(boolean_array_layer), dimension(:), allocatable :: layer
-   contains
-     procedure :: get => get_boolean_array_section
-  end type boolean_array_section
-  
-  type boolean_array_layer
-     integer(i4b) :: nvar
-     integer(i4b) :: ispec1
-     integer(i4b), dimension(:,:,:), allocatable :: data
-   contains
-     procedure :: get => get_boolean_array_layer
-  end type boolean_array_layer
 
   interface spherical_mesh
      procedure :: make_spherical_mesh
@@ -167,57 +173,47 @@ contains
                      layer_mesh =>  mesh%section(isection)%layer(ilayer))
             select type(layer)
              
+
             class is(spherical_layer)
-               if(allocated(mesh_tmp)) deallocate(mesh_tmp)
-               mesh_tmp = make_spherical_layer_mesh(ngll,layer,drmax)
-               select type(mesh_tmp)
+               select type(layer_mesh)
                class is(spherical_layer_mesh)
-                  layer_mesh = mesh_tmp                
+                  call make_spherical_layer_mesh(ngll,layer,drmax,layer_mesh)
                end select
                
             class is(spherical_solid_elastic_layer)
-               if(allocated(mesh_tmp)) deallocate(mesh_tmp)            
-               mesh_tmp = make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax)
-               select type(mesh_tmp)
+               select type(layer_mesh)
                class is(spherical_solid_elastic_layer_mesh)
-                  layer_mesh = mesh_tmp                
+                  call make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax,layer_mesh)
                end select
-               
+
                
             class is(spherical_fluid_elastic_layer)
-               if(allocated(mesh_tmp)) deallocate(mesh_tmp)
-               mesh_tmp = make_spherical_fluid_elastic_layer_mesh(ngll,layer,drmax)
-               select type(mesh_tmp)
+               select type(layer_mesh)
                class is(spherical_fluid_elastic_layer_mesh)
-                  layer_mesh = mesh_tmp
-               end select
+                  call make_spherical_fluid_elastic_layer_mesh(ngll,layer,drmax,layer_mesh)
+               end select               
 
 
             class is(spherical_solid_anelastic_layer)
-               if(allocated(mesh_tmp)) deallocate(mesh_tmp)            
-               mesh_tmp = make_spherical_solid_anelastic_layer_mesh(ngll,layer,drmax)
-               select type(mesh_tmp)
+               select type(layer_mesh)
                class is(spherical_solid_anelastic_layer_mesh)
-                  layer_mesh = mesh_tmp                
+                  call make_spherical_solid_anelastic_layer_mesh(ngll,layer,drmax,layer_mesh)
                end select
-               
+
                
             class is(spherical_fluid_anelastic_layer)
-               if(allocated(mesh_tmp)) deallocate(mesh_tmp)
-               mesh_tmp = make_spherical_fluid_anelastic_layer_mesh(ngll,layer,drmax)
-               select type(mesh_tmp)
+               select type(layer_mesh)
                class is(spherical_fluid_anelastic_layer_mesh)
-                  layer_mesh = mesh_tmp
-               end select
+                  call make_spherical_fluid_anelastic_layer_mesh(ngll,layer,drmax,layer_mesh)
+               end select               
                
-               
+
             class is(spherical_maxwell_layer)
-               if(allocated(mesh_tmp)) deallocate(mesh_tmp)
-               mesh_tmp = make_spherical_maxwell_layer_mesh(ngll,layer,drmax)
-               select type(mesh_tmp)
+               select type(layer_mesh)
                class is(spherical_maxwell_layer_mesh)
-                  layer_mesh = mesh_tmp                
+                  call make_spherical_maxwell_layer_mesh(ngll,layer,drmax,layer_mesh)
                end select
+
                
             end select
             
@@ -330,12 +326,13 @@ contains
     
   end subroutine print_mesh_summary
   
+
   
-  function make_spherical_layer_mesh(ngll,layer,drmax) result(mesh)
+  subroutine make_spherical_layer_mesh(ngll,layer,drmax,mesh)
     integer(i4b), intent(in) :: ngll
     class(spherical_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
-    type(spherical_layer_mesh) :: mesh
+    type(spherical_layer_mesh), intent(out) :: mesh
     integer(i4b) :: ispec,nspec,inode,jspec
     real(dp) :: r1,r2,r11,r22,dr,r
     real(dp), dimension(ngll) :: h
@@ -382,21 +379,19 @@ contains
     end do
     
     return
-  end function make_spherical_layer_mesh
+  end subroutine make_spherical_layer_mesh
 
-
-
-
-  function make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax) result(mesh)
+    
+  subroutine make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax,mesh)
     integer(i4b), intent(in) :: ngll
     class(spherical_solid_elastic_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
-    type(spherical_solid_elastic_layer_mesh) :: mesh
+    type(spherical_solid_elastic_layer_mesh), intent(out) :: mesh
 
     integer(i4b) :: ispec,nspec,inode,jspec
     real(dp) :: r
         
-    mesh%spherical_layer_mesh = make_spherical_layer_mesh(ngll,layer,drmax)
+    call make_spherical_layer_mesh(ngll,layer,drmax,mesh%spherical_layer_mesh)        
     allocate(mesh%A(mesh%ngll,mesh%nspec))
     allocate(mesh%C(mesh%ngll,mesh%nspec))
     allocate(mesh%F(mesh%ngll,mesh%nspec))
@@ -419,20 +414,20 @@ contains
     
     
     return
-  end function make_spherical_solid_elastic_layer_mesh
+  end subroutine make_spherical_solid_elastic_layer_mesh
 
 
 
-  function make_spherical_fluid_elastic_layer_mesh(ngll,layer,drmax) result(mesh)
+  subroutine make_spherical_fluid_elastic_layer_mesh(ngll,layer,drmax,mesh)
     integer(i4b), intent(in) :: ngll
     class(spherical_fluid_elastic_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
-    type(spherical_fluid_elastic_layer_mesh) :: mesh
+    type(spherical_fluid_elastic_layer_mesh), intent(out) :: mesh
 
     integer(i4b) :: ispec,nspec,inode,jnode
     real(dp) :: r
         
-    mesh%spherical_layer_mesh = make_spherical_layer_mesh(ngll,layer,drmax)
+    call make_spherical_layer_mesh(ngll,layer,drmax,mesh%spherical_layer_mesh)        
     allocate(mesh%kappa(mesh%ngll,mesh%nspec))
     allocate(mesh%drho(mesh%ngll,mesh%nspec))
     do ispec = 1,mesh%nspec
@@ -449,20 +444,19 @@ contains
     end do
     
     return
-  end function make_spherical_fluid_elastic_layer_mesh
+  end subroutine make_spherical_fluid_elastic_layer_mesh
 
 
-
-  function make_spherical_solid_anelastic_layer_mesh(ngll,layer,drmax) result(mesh)
+  subroutine make_spherical_solid_anelastic_layer_mesh(ngll,layer,drmax,mesh)
     integer(i4b), intent(in) :: ngll
     class(spherical_solid_anelastic_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
-    type(spherical_solid_anelastic_layer_mesh) :: mesh
+    type(spherical_solid_anelastic_layer_mesh), intent(out) :: mesh
 
     integer(i4b) :: ispec,nspec,inode,jspec
     real(dp) :: r
         
-    mesh%spherical_solid_elastic_layer_mesh = make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax)
+    call make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax,mesh%spherical_solid_elastic_layer_mesh)
     allocate(mesh%qA(mesh%ngll,mesh%nspec))
     allocate(mesh%qC(mesh%ngll,mesh%nspec))
     allocate(mesh%qF(mesh%ngll,mesh%nspec))
@@ -485,20 +479,20 @@ contains
     
     
     return
-  end function make_spherical_solid_anelastic_layer_mesh
+  end subroutine make_spherical_solid_anelastic_layer_mesh
 
 
   
-  function make_spherical_fluid_anelastic_layer_mesh(ngll,layer,drmax) result(mesh)
+  subroutine make_spherical_fluid_anelastic_layer_mesh(ngll,layer,drmax,mesh)
     integer(i4b), intent(in) :: ngll
     class(spherical_fluid_anelastic_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
-    type(spherical_fluid_anelastic_layer_mesh) :: mesh
+    type(spherical_fluid_anelastic_layer_mesh), intent(out) :: mesh
 
     integer(i4b) :: ispec,nspec,inode,jspec
     real(dp) :: r
         
-    mesh%spherical_fluid_elastic_layer_mesh = make_spherical_fluid_elastic_layer_mesh(ngll,layer,drmax)
+    call make_spherical_fluid_elastic_layer_mesh(ngll,layer,drmax,mesh%spherical_fluid_elastic_layer_mesh)
     allocate(mesh%qkappa(mesh%ngll,mesh%nspec))
     do ispec = 1,mesh%nspec
        do inode = 1,mesh%ngll
@@ -506,23 +500,22 @@ contains
           mesh%qkappa(inode,ispec) = layer%qkappa(r)
        end do
     end do
-    
-    
+        
     return
-  end function make_spherical_fluid_anelastic_layer_mesh
+  end subroutine make_spherical_fluid_anelastic_layer_mesh
 
   
 
-  function make_spherical_maxwell_layer_mesh(ngll,layer,drmax) result(mesh)
+  subroutine make_spherical_maxwell_layer_mesh(ngll,layer,drmax,mesh)
     integer(i4b), intent(in) :: ngll
     class(spherical_maxwell_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
-    type(spherical_maxwell_layer_mesh) :: mesh
+    type(spherical_maxwell_layer_mesh), intent(out) :: mesh
 
     integer(i4b) :: ispec,nspec,inode,jspec
     real(dp) :: r
         
-    mesh%spherical_solid_elastic_layer_mesh = make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax)
+    call make_spherical_solid_elastic_layer_mesh(ngll,layer,drmax,mesh%spherical_solid_elastic_layer_mesh)
     allocate(mesh%eta(mesh%ngll,mesh%nspec))
     do ispec = 1,mesh%nspec
        do inode = 1,mesh%ngll
@@ -533,7 +526,7 @@ contains
     
     
     return
-  end function make_spherical_maxwell_layer_mesh
+  end subroutine make_spherical_maxwell_layer_mesh
 
 
 

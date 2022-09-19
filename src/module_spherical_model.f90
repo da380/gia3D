@@ -8,6 +8,21 @@ module module_spherical_model
   !========================================!
   !                basic types             !
   !========================================!
+
+
+  type, abstract :: spherical_layer
+     real(dp) :: r1
+     real(dp) :: r2
+   contains
+     procedure(spherical_layer_function), deferred :: rho
+  end type spherical_layer
+ 
+  type spherical_section
+     integer(i4b) :: nlayers
+     real(dp) :: r1
+     real(dp) :: r2
+     class(spherical_layer), dimension(:), allocatable :: layer
+  end type spherical_section
   
   type spherical_model
      real(dp) :: r1
@@ -19,20 +34,6 @@ module module_spherical_model
      procedure :: write_maxwell => write_maxwell_spherical_model
      procedure :: write_anelastic => write_anelastic_spherical_model
   end type spherical_model
-  
-  type spherical_section
-     integer(i4b) :: nlayers
-     real(dp) :: r1
-     real(dp) :: r2
-     class(spherical_layer), dimension(:), allocatable :: layer
-  end type spherical_section
-
-  type, abstract :: spherical_layer
-     real(dp) :: r1
-     real(dp) :: r2
-   contains
-     procedure(spherical_layer_function), deferred :: rho
-  end type spherical_layer
 
   abstract interface
      function spherical_layer_function(self,r) result(f)
