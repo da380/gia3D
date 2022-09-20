@@ -45,7 +45,7 @@ module module_spherical_harmonics
   !              type declarations for the GL-fields              !
   !===============================================================!
 
-  type, abstract :: gauss_legendre_field
+  type :: gauss_legendre_field
      !
      ! Complex components are stored within the complex array cdata
      ! the index of the (iph,ith,icomp) value is:
@@ -81,7 +81,7 @@ module module_spherical_harmonics
      procedure :: saxpy_gauss_legendre_field
      procedure :: real_saxpy_gauss_legendre_field          
      generic   :: saxpy => saxpy_gauss_legendre_field,     &
-          real_saxpy_gauss_legendre_field
+                           real_saxpy_gauss_legendre_field
   end type gauss_legendre_field
 
   type, extends(gauss_legendre_field) :: scalar_gauss_legendre_field
@@ -132,7 +132,7 @@ module module_spherical_harmonics
   !                 type declarations SH expansions               !
   !===============================================================!
   
-  type, abstract :: spherical_harmonic_expansion
+  type :: spherical_harmonic_expansion
      !
      ! Complex componets are stored in the complex array cdata
      ! values are stored in blocks for each component. For each
@@ -141,8 +141,7 @@ module module_spherical_harmonics
      !
      ! (0,0),(1,0),(1,1),(1,-1),(2,0),(2,1),(2,-1),(2,2),(2,-2),...
      !
-     ! To get the indices easily, there is the procedure self%cindex(m,l,icomp)
-     ! note the ordering of order and degree within this function
+     ! To get the indices easily, there is the procedure self%cindex(l,m,icomp)
      !
      ! for components with |n| > 0 there are no coefficients when l < |n|
      ! within the storage arrays these elements are present, but should
@@ -156,7 +155,7 @@ module module_spherical_harmonics
      !
      ! (0,0),(1,0),(1,1),(2,0),(2,1),(2,2),...
      !
-     ! To get the indices easily, there is the proceedure self%rindex(m,l,icomp)
+     ! To get the indices easily, there is the proceedure self%rindex(l,m,icomp)
      !
      logical :: allocated
      integer(i4b) :: lmax
@@ -185,6 +184,11 @@ module module_spherical_harmonics
      generic   :: saxpy => saxpy_spherical_harmonic_expansion,     &
                            real_saxpy_spherical_harmonic_expansion
      procedure :: random => random_values_spherical_harmonic_expansion
+     procedure :: copy => copy_spherical_harmonic_expansion     
+     procedure :: filter_spherical_harmonic_expansion
+     procedure :: filter_precomp_spherical_harmonic_expansion
+     generic   :: filter => filter_spherical_harmonic_expansion, &
+                            filter_precomp_spherical_harmonic_expansion
   end type spherical_harmonic_expansion
 
   type, extends(spherical_harmonic_expansion) :: scalar_spherical_harmonic_expansion
@@ -227,7 +231,16 @@ module module_spherical_harmonics
      procedure :: get => get_internal_variable_spherical_harmonic_expansion
   end type internal_variable_spherical_harmonic_expansion
   
-     
+
+  abstract interface
+     real(dp) function filter_function(l,iarg,rarg) result(f)
+       use module_constants
+       integer(i4b), intent(in) :: l
+       integer(i4b), dimension(:), intent(in), optional :: iarg
+       real(dp), dimension(:), intent(in), optional :: rarg
+     end function filter_function
+  end interface
+  
 contains
 
   !=======================================================================!
@@ -1341,10 +1354,10 @@ contains
     return
   end subroutine allocate_spherical_harmonic_expansion
 
-  function cindex_spherical_harmonic_expansion(self,m,l,icomp) result(i)
+  function cindex_spherical_harmonic_expansion(self,l,m,icomp) result(i)
     implicit none
     class(spherical_harmonic_expansion), intent(in) :: self
-    integer(i4b), intent(in) :: m,l,icomp
+    integer(i4b), intent(in) :: l,m,icomp
     integer(i4b) :: i
     i = self%cncoef*(icomp-1) + l**2
     if(m == 0) then
@@ -1358,10 +1371,10 @@ contains
   end function cindex_spherical_harmonic_expansion
 
 
-  function rindex_spherical_harmonic_expansion(self,m,l,icomp) result(i)
+  function rindex_spherical_harmonic_expansion(self,l,m,icomp) result(i)
     implicit none
     class(spherical_harmonic_expansion), intent(in) :: self
-    integer(i4b), intent(in) :: m,l,icomp
+    integer(i4b), intent(in) :: l,m,icomp
     integer(i4b) :: i
     i = self%rncoef*(icomp-1) + l*(l+1)/2 + m + 1
     return
@@ -1440,7 +1453,7 @@ contains
                 rand2 = 2.0_dp*(rand2-0.5_dp)
              end if
              cfun = (rand1+ii*rand2)*(1.0_dp+self%mu*l*(l+1))**(-self%s)
-             self%rdata(self%rindex(m,l,icomp)) = cfun
+             self%rdata(self%rindex(l,m,icomp)) = cfun
           end do
        end do
     end do
@@ -1454,7 +1467,7 @@ contains
              rand1 = 2.0_dp*(rand1-0.5_dp)
              rand2 = 2.0_dp*(rand2-0.5_dp)
              cfun = (rand1+ii*rand2)*(1.0_dp+0.1*l*(l+1))**(-1.5)
-             self%cdata(self%cindex(m,l,icomp)) = cfun
+             self%cdata(self%cindex(l,m,icomp)) = cfun
           end do
        end do
     end do
@@ -1462,8 +1475,143 @@ contains
     
     return
   end subroutine random_values_spherical_harmonic_expansion
+
+
+  subroutine copy_spherical_harmonic_expansion(self,grid,other)
+    implicit none
+    class(spherical_harmonic_expansion), intent(in) :: self
+    type(gauss_legendre_grid), intent(in) :: grid
+    class(spherical_harmonic_expansion),  intent(out) :: other
+
+    integer(i4b) :: lmax,i1,i2,j1,j2,i
+
+    ! set up the new expansion
+    other%lmax  = grid%lmax
+    other%s     = self%s
+    other%mu    = self%mu
+    other%nc    = self%nc
+    other%cncoef = (other%lmax+1)**2
+    other%cdim   = other%nc*other%cncoef
+    allocate(other%nval(other%nc))    
+    allocate(other%cdata(other%cdim))
+    other%cdata = 0.0_dp
+    other%nr     = self%nr
+    other%rncoef = (other%lmax+1)*(other%lmax+2)/2
+    other%rdim   = other%nr*other%rncoef
+    allocate(other%rdata(other%rdim))
+    other%rdata = 0.0_dp
+
+    ! copy complex data
+    lmax = min(self%lmax,other%lmax)
+    do i = 1,self%nc
+       i1 = self%cindex(0,0,i)
+       i2 = self%cindex(lmax,-lmax,i)
+       j1 = other%cindex(0,0,i)
+       j2 = other%cindex(lmax,-lmax,i)
+       other%cdata(j1:j2) = self%cdata(i1:i2)
+    end do
+
+    ! copy real data
+    do i = 1,self%nr
+       i1 = self%rindex(0,0,i)
+       i2 = self%rindex(lmax,lmax,i)
+       j1 = other%rindex(0,0,i)
+       j2 = other%rindex(lmax,lmax,i)
+       other%rdata(j1:j2) = self%rdata(i1:i2)
+    end do
+
+    return
+  end subroutine copy_spherical_harmonic_expansion
   
 
+  subroutine filter_spherical_harmonic_expansion(self,filter,iarg,rarg)
+    class(spherical_harmonic_expansion), intent(inout) :: self
+    procedure(filter_function) :: filter
+    integer(i4b), dimension(:), intent(in), optional :: iarg
+    real(dp), dimension(:), intent(in), optional :: rarg
+
+    integer(i4b) :: i,l,i1,i2
+    real(dp) :: f
+
+    do i = 1,self%nc
+       do l = 0,self%lmax
+          f = filter(l,iarg,rarg)
+          i1 = self%cindex(l,0,i)
+          i2 = self%cindex(l,-l,i)
+          self%cdata(i1:i2) = f*self%cdata(i1:i2)
+       end do
+    end do
+
+    do i = 1,self%nr
+       do l = 0,self%lmax
+          f = filter(l,iarg,rarg)
+          i1 = self%rindex(l,0,i)
+          i2 = self%rindex(l,l,i)
+          self%rdata(i1:i2) = f*self%rdata(i1:i2)
+       end do
+    end do
+
+    
+    return
+  end subroutine filter_spherical_harmonic_expansion
+
+
+  subroutine filter_precomp_spherical_harmonic_expansion(self,ff)
+    class(spherical_harmonic_expansion), intent(inout) :: self
+    real(dp), dimension(0:self%lmax), intent(in) :: ff
+
+    integer(i4b) :: i,l,i1,i2
+    real(dp) :: f
+
+    do i = 1,self%nc
+       do l = 0,self%lmax
+          f = ff(l)
+          i1 = self%cindex(l,0,i)
+          i2 = self%cindex(l,-l,i)
+          self%cdata(i1:i2) = f*self%cdata(i1:i2)
+       end do
+    end do
+
+    do i = 1,self%nr
+       do l = 0,self%lmax
+          f = ff(l)
+          i1 = self%rindex(l,0,i)
+          i2 = self%rindex(l,l,i)
+          self%rdata(i1:i2) = f*self%rdata(i1:i2)
+       end do
+    end do
+
+    
+    return
+  end subroutine filter_precomp_spherical_harmonic_expansion
+
+  real(dp) function constant_filter(l,iarg,rarg) result(f)
+    implicit none
+    integer(i4b), intent(in) :: l
+    integer(i4b), dimension(:), intent(in), optional :: iarg
+    real(dp), dimension(:), intent(in), optional :: rarg
+    f = 1.0_dp
+    return
+  end function constant_filter
+
+
+  real(dp) function sobolev_filter(l,iarg,rarg) result(f)
+    implicit none
+    integer(i4b), intent(in) :: l
+    integer(i4b), dimension(:), intent(in), optional :: iarg
+    real(dp), dimension(:), intent(in), optional :: rarg
+    real(dp) :: s,mu
+    if(present(rarg)) then
+       s = rarg(1)       
+       mu = rarg(2)
+    else
+       stop 'sobolev_filter: real parameters not input'
+    end if
+    f = 1.0_dp + mu*mu*l*(l+1)
+    f = f**s
+    return
+  end function sobolev_filter
+  
   !------------------------------------------------------!
   !            procedures for derived types              !
   !------------------------------------------------------!
@@ -1484,7 +1632,7 @@ contains
     class(scalar_spherical_harmonic_expansion), intent(inout) :: self
     integer(i4b), intent(in) :: l,m
     complex(dpc), intent(in) :: val
-    self%cdata(self%cindex(m,l,1)) = val
+    self%cdata(self%cindex(l,m,1)) = val
     return
   end subroutine set_scalar_spherical_harmonic_expansion
 
@@ -1493,7 +1641,7 @@ contains
     class(scalar_spherical_harmonic_expansion), intent(in) :: self
     integer(i4b), intent(in) :: l,m
     complex(dpc) :: val
-    val = self%cdata(self%cindex(m,l,1))
+    val = self%cdata(self%cindex(l,m,1))
     return
   end function get_scalar_spherical_harmonic_expansion
 
@@ -1517,9 +1665,9 @@ contains
     integer(i4b), intent(in) :: l,m
     complex(dpc), intent(in) :: val
     if(m >= 0) then
-       self%rdata(self%rindex(m,l,1)) = val
+       self%rdata(self%rindex(l,m,1)) = val
     else
-       self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
+       self%rdata(self%rindex(l,abs(m),1)) = (-1)**m*conjg(val)
     end if
     return
   end subroutine set_real_scalar_spherical_harmonic_expansion
@@ -1530,9 +1678,9 @@ contains
     integer(i4b), intent(in) :: l,m
     complex(dpc) :: val
     if(m >= 0) then
-       val = self%rdata(self%rindex(m,l,1))
+       val = self%rdata(self%rindex(l,m,1))
     else
-       val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+       val = (-1)**m*conjg(self%rdata(self%rindex(l,abs(m),1)))
     end if
     return
   end function get_real_scalar_spherical_harmonic_expansion
@@ -1555,7 +1703,7 @@ contains
     complex(dpc), intent(in) :: val
     integer(i4b) :: icomp
     icomp = alpha+2
-    self%cdata(self%cindex(m,l,icomp)) = val
+    self%cdata(self%cindex(l,m,icomp)) = val
     return
   end subroutine set_vector_spherical_harmonic_expansion
 
@@ -1566,7 +1714,7 @@ contains
     complex(dpc) :: val
     integer(i4b) :: icomp
     icomp = alpha+2
-    val = self%cdata(self%cindex(m,l,icomp))
+    val = self%cdata(self%cindex(l,m,icomp))
     return
   end function get_vector_spherical_harmonic_expansion
 
@@ -1588,12 +1736,12 @@ contains
     complex(dpc), intent(in) :: val        
     select case(alpha)
     case(-1)
-       self%cdata(self%cindex(m,l,1)) = val
+       self%cdata(self%cindex(l,m,1)) = val
     case(0)
        if(m >= 0) then
-          self%rdata(self%rindex(m,l,1)) = val
+          self%rdata(self%rindex(l,m,1)) = val
        else
-          self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
+          self%rdata(self%rindex(l,abs(m),1)) = (-1)**m*conjg(val)
        endif
     case(1)
        self%cdata(self%cindex(-m,l,1)) = (-1)**m*conjg(val)
@@ -1608,12 +1756,12 @@ contains
     complex(dpc) :: val
     select case(alpha)
     case(-1)
-       val = self%cdata(self%cindex(m,l,1))
+       val = self%cdata(self%cindex(l,m,1))
     case(0)
        if(m >= 0) then
-          val = self%rdata(self%rindex(m,l,1))
+          val = self%rdata(self%rindex(l,m,1))
        else
-          val = (-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+          val = (-1)**m*conjg(self%rdata(self%rindex(l,abs(m),1)))
        end if
     case(1)
        val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,1)))
@@ -1641,30 +1789,30 @@ contains
     integer(i4b), intent(in) :: l,m,alpha,beta
     complex(dpc), intent(in) :: val
     if(alpha == -1 .and. beta == -1) then
-       self%cdata(self%cindex(m,l,1)) = val
+       self%cdata(self%cindex(l,m,1)) = val
     else if(alpha == 0 .and. beta == -1) then
-       self%cdata(self%cindex(m,l,2)) = val
+       self%cdata(self%cindex(l,m,2)) = val
     else if(alpha == 1 .and. beta == -1) then
        if(m >= 0) then
-          self%rdata(self%rindex(m,l,1)) = 2.0_dp*val
+          self%rdata(self%rindex(l,m,1)) = 2.0_dp*val
        else
-          self%rdata(self%rindex(abs(m),l,1)) = 2.0_dp*(-1)**m*conjg(val)
+          self%rdata(self%rindex(l,abs(m),1)) = 2.0_dp*(-1)**m*conjg(val)
        end if
     else if(alpha == -1 .and. beta == 0) then
-       self%cdata(self%cindex(m,l,2)) = val
+       self%cdata(self%cindex(l,m,2)) = val
     else if(alpha == 0 .and. beta == 0) then
        if(m >= 0) then
-          self%rdata(self%rindex(m,l,1)) = val
+          self%rdata(self%rindex(l,m,1)) = val
        else
-          self%rdata(self%rindex(abs(m),l,1)) = (-1)**m*conjg(val)
+          self%rdata(self%rindex(l,abs(m),1)) = (-1)**m*conjg(val)
        end if
     else if(alpha == 1 .and. beta == 0) then
        self%cdata(self%cindex(-m,l,2)) = (-1)**m*conjg(val)
     else if(alpha == -1 .and. beta == 1) then
        if(m >= 0) then
-          self%rdata(self%rindex(m,l,1)) = 2.0_dp*val
+          self%rdata(self%rindex(l,m,1)) = 2.0_dp*val
        else
-          self%rdata(self%rindex(abs(m),l,1)) = 2.0_dp*(-1)**m*conjg(val)
+          self%rdata(self%rindex(l,abs(m),1)) = 2.0_dp*(-1)**m*conjg(val)
        end if
     else if(alpha == 0 .and. beta == 1) then
        self%cdata(self%cindex(-m,l,2)) = (-1)**m*conjg(val)
@@ -1680,20 +1828,20 @@ contains
     integer(i4b), intent(in) :: l,m,alpha,beta
     complex(dpc) :: val
     if(alpha == -1 .and. beta == -1) then
-       val = self%cdata(self%cindex(m,l,1)) 
+       val = self%cdata(self%cindex(l,m,1)) 
     else if(alpha == 0 .and. beta == -1) then
-       val = self%cdata(self%cindex(m,l,2)) 
+       val = self%cdata(self%cindex(l,m,2)) 
     else if(alpha == 1 .and. beta == -1) then
        if(m >= 0) then
-          val = 0.5_dp*self%rdata(self%rindex(m,l,1)) 
+          val = 0.5_dp*self%rdata(self%rindex(l,m,1)) 
        else
           val = 0.5_dp*(-1)**m*conjg(self%rdata(self%rindex(-m,l,1)))
        end if
     else if(alpha == -1 .and. beta == 0) then
-       val = self%cdata(self%cindex(m,l,2)) 
+       val = self%cdata(self%cindex(l,m,2)) 
     else if(alpha == 0 .and. beta == 0) then
        if(m >= 0) then
-          val = self%rdata(self%rindex(m,l,1)) 
+          val = self%rdata(self%rindex(l,m,1)) 
        else
           val = (-1)**m*conjg(self%rdata(self%rindex(-m,l,1)))
        end if
@@ -1701,9 +1849,9 @@ contains
        val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,2)))
     else if(alpha == -1 .and. beta == 1) then
        if(m >= 0) then
-          val = 0.5_dp*self%rdata(self%rindex(m,l,1)) 
+          val = 0.5_dp*self%rdata(self%rindex(l,m,1)) 
        else
-          val = 0.5_dp*(-1)**m*conjg(self%rdata(self%rindex(abs(m),l,1)))
+          val = 0.5_dp*(-1)**m*conjg(self%rdata(self%rindex(l,abs(m),1)))
        end if
     else if(alpha == 0 .and. beta == 1) then
        val = (-1)**m*conjg(self%cdata(self%cindex(-m,l,2)))

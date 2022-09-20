@@ -8,6 +8,7 @@ program test_spherical_harmonics
 
   integer(i4b) :: lmax,nmax,n,l,m,ith,iph,ilm,k,klm,alpha,i,beta
   real(dp) :: start,finish,th,ph,rand1,rand2,rfun
+  real(dp), dimension(:), allocatable :: ff
   complex(dpc) :: cfun
   type(gauss_legendre_grid) :: grid
 
@@ -36,7 +37,7 @@ program test_spherical_harmonics
 
   
   ! make the grid  
-  lmax = 512
+  lmax = 64
   nmax = 2
   print *, 'building the grid for degree ',lmax
   call cpu_time(start)
@@ -65,6 +66,20 @@ program test_spherical_harmonics
   ! set random values
   call ulm%set_sobolev(2.0_dp,0.5_dp)
   call ulm%random()
+
+
+  
+  print *, ulm%get(20,2)
+
+  allocate(ff(0:ulm%lmax))
+  do l = 0,lmax
+     ff(l) = constant_filter(l)
+  end do
+  call ulm%filter(sobolev_filter,rarg = (/-2.0_dp,1.0_dp/))
+
+  print *, ulm%get(20,2)
+  
+  stop
   
   ! allocate a scalar field
   call u%allocate(grid)
@@ -85,6 +100,7 @@ program test_spherical_harmonics
   print *, 'error in coefficients = ', maxval(abs(ulm%cdata-vlm%cdata))
   print *, '-----------------------------------------'
 
+  
   !=============================================================!
   !            test function to coefficient and back            !
   !=============================================================!
@@ -155,7 +171,7 @@ program test_spherical_harmonics
 
   ! set function as single harmonic
   l = lmax
-  m = -lmax/2
+  m = -lmax/4
   call w%harmonic(grid,l,m)
   
   ! compute the transform
