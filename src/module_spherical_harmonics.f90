@@ -36,8 +36,7 @@ module module_spherical_harmonics
      procedure :: wrapper_SH_itrans_gauss_legendre_grid
      generic :: SH_itrans => SH_itrans_gauss_legendre_grid,        &
                              real_SH_itrans_gauss_legendre_grid,   &
-                            wrapper_SH_itrans_gauss_legendre_grid
-     
+                            wrapper_SH_itrans_gauss_legendre_grid     
   end type gauss_legendre_grid
 
 

@@ -38,7 +38,8 @@ SRCS = test_special_functions.f90    \
        test.f90                      \
        test_mesh.f90                 \
        test_matrix.f90               \
-       load_love_numbers.f90         
+       load_love_numbers.f90         \
+       tide_love_numbers.f90
 
 
 ###########################################################
@@ -57,7 +58,9 @@ MOD_SRCS = module_constants.f90            \
 	   module_PREM.f90                 \
 	   module_DECK.f90                 \
            module_mesh.f90                 \
-	   module_matrix.f90
+	   module_matrix.f90               \
+           module_force.f90                \
+           module_linear_solver.f90
 
 
 ###########################################################

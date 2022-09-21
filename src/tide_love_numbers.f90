@@ -1,4 +1,4 @@
-program load_love_numbers
+program tide_love_numbers
  
   use module_constants
   use module_util
@@ -33,7 +33,6 @@ program load_love_numbers
   drmax = 0.1_dp*model%r2/(lmax+1)
   ngll = 5
   mesh = spherical_mesh(ngll,model,drmax)
-
   
   ! loop over the degrees
   open(newunit = io,file=trim(output_file))
@@ -47,20 +46,18 @@ program load_love_numbers
      kd = sphmat%kd
      ldab = sphmat%ldab
      if(allocated(b)) deallocate(b); allocate(b(ndim,1))
-     b = 0.0_dp
-
+     b = 0.0_dp     
+     call force_for_unit_harmonic_tide(mesh,sphmat%ibool,l,b)
+     
      isection = mesh%nsections
      ilayer = mesh%section(isection)%nlayers
      associate(layer => mesh%section(isection)%layer(ilayer),         &
                ibool => sphmat%ibool%section(isection)%layer(ilayer))
 
-       call force_for_unit_harmonic_load(layer,ibool,l,b)
-
        ! solve the linear system
        call dpbtrs('U',ndim,kd,1,sphmat%a,ldab,b,ndim,info)
        call error(info /= 0,'test_matrix','problem with spheroidal substitution')  
 
- 
        inode = layer%ngll
        ispec = layer%nspec
        g = layer%g(inode,ispec)
@@ -74,16 +71,14 @@ program load_love_numbers
        else
           p = 0.0_dp
        end if
-
        
        write(io,'(i6,3e20.8)') l,u*length_norm, &
                                  v*length_norm, &
                                  p*length_norm
        
      end associate
-
      
   end do
   close(io)
   
-end program load_love_numbers
+end program tide_love_numbers

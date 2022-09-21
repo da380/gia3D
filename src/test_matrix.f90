@@ -7,6 +7,7 @@ program test_matrix
   use module_DECK
   use module_mesh
   use module_matrix
+  use module_force
   implicit none
 
   logical :: spectop,ibnd,found
@@ -20,7 +21,7 @@ program test_matrix
   type(radial_matrix) :: tormat,sphmat,sphmat2
   real(dp), dimension(:,:), allocatable :: b
   type(boolean_array) :: bool
-
+  type(radial_matrices) :: mat
 
   call check_arguments(1,'-l [int > 0]')
   if(.not. found_command_argument('-l',l) .or. l < 0) stop 'l not set'
@@ -30,6 +31,11 @@ program test_matrix
   ngll = 5
   mesh = spherical_mesh(ngll,model,drmax)
 
+
+
+  mat = build_radial_matrices(mesh,l,spheroidals = .true. ,toroidals = .true.)
+
+  stop
   
   !============================================================!
   !                       toroidal section                     !
@@ -98,19 +104,21 @@ program test_matrix
   deallocate(b); allocate(b(ndim,1))
   b = 0.0_dp
 
-  isection = mesh%nsections
-  ilayer = mesh%section(isection)%nlayers
-  associate(layer => mesh%section(isection)%layer(ilayer),         &
-            ibool => sphmat%ibool%section(isection)%layer(ilayer))
-    ispec = layer%nspec
-    inode = layer%ngll
-    i = ibool%get(1,inode,ispec)
-    b(i,1) = layer%g(inode,ispec)
-    if(l > 1) then
-       i = ibool%get(3,inode,ispec)
-       b(i,1) = 1.0_dp
-    end if
-  end associate
+!  isection = mesh%nsections
+!  ilayer = mesh%section(isection)%nlayers
+!  associate(layer => mesh%section(isection)%layer(ilayer),         &
+!            ibool => sphmat%ibool%section(isection)%layer(ilayer))
+!    ispec = layer%nspec
+!    inode = layer%ngll
+!    i = ibool%get(1,inode,ispec)
+!    b(i,1) = layer%g(inode,ispec)
+!    if(l > 1) then
+!       i = ibool%get(3,inode,ispec)
+!       b(i,1) = 1.0_dp
+!    end if
+  !  end associate
+
+  call force_for_unit_harmonic_tide(mesh,sphmat%ibool,l,b)
 
   
   call dpbtrs('U',ndim,kd,1,sphmat%a,ldab,b,ndim,info)

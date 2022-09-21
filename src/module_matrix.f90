@@ -19,10 +19,69 @@ module module_matrix
      real(dp), dimension(:,:), allocatable :: a
   end type radial_matrix
 
+  type radial_matrices
+     logical :: factorised = .false.
+     logical :: spheroidals = .false.
+     logical :: toroidals   = .false.
+     integer(i4b) :: lmax
+     integer(i4b) :: ndim_sph
+     integer(i4b) :: ndim_tor
+     type(radial_matrix), dimension(:), allocatable :: sph
+     type(radial_matrix), dimension(:), allocatable :: tor
+  end type radial_matrices
   
 contains
 
 
+  type(radial_matrices) function build_radial_matrices(mesh,lmax,spheroidals,toroidals,factor) result(mat)
+    type(spherical_model_mesh), intent(in) :: mesh
+    integer(i4b), intent(in) :: lmax
+    logical, intent(in), optional :: spheroidals
+    logical, intent(in), optional :: toroidals
+    logical, intent(in), optional :: factor
+
+    integer(i4b) :: l
+
+    if(present(factor)) then
+       mat%factorised = factor
+    else
+       mat%factorised = .true.
+    end if
+    
+    if(lmax > 0) then
+       mat%lmax = lmax
+    else
+       stop 'build_radial_matrices: lmax < 1'
+    end if
+    if(present(spheroidals)) then
+       mat%spheroidals = spheroidals
+       allocate(mat%sph(1:lmax))
+    end if
+    if(present(toroidals)) then
+       mat%toroidals = toroidals
+       allocate(mat%tor(1:lmax))
+    end if
+
+    mat%ndim_sph = 0
+    mat%ndim_tor = 0
+    do l = 1,lmax
+
+       if(mat%spheroidals) then
+          mat%sph(l) =  build_spheroidal_matrix(mesh,l,factor)
+          if(mat%sph(l)%ndim > mat%ndim_sph) mat%ndim_sph = mat%sph(l)%ndim
+       end if
+
+       if(mat%toroidals) then
+          mat%tor(l) =  build_toroidal_matrix(mesh,l,factor)
+          if(mat%tor(l)%ndim > mat%ndim_tor) mat%ndim_tor = mat%tor(l)%ndim
+       end if
+       
+    end do
+    
+
+    return
+  end function build_radial_matrices
+  
   !=================================================================!
   !                        Toroidal routines                        !
   !=================================================================!
