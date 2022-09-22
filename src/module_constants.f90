@@ -55,5 +55,8 @@ module module_constants
   ! conversions between seconds and years
   real(dp), parameter :: yr2sec = 60.0_dp*60.0_dp*24.0_dp*365.25_dp
   real(dp), parameter :: sec2yr = 1.0_dp/yr2sec  
+
+  ! default string length
+  integer(i4b), parameter :: max_string_length = 1024
   
 end module module_constants

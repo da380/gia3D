@@ -12,13 +12,14 @@ F95 = gfortran
 
 # fftw3 f90 location
 FFTW3 = /home/david/lib/fftw-3.3.3/api
+NETCDF = /usr/include/
 
 # set the flags
-FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3)
+FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3) -I$(NETCDF)
 
 
 # libraries to link to
-LIBS =  -lfftw3 -lblas -llapack
+LIBS =  -lfftw3 -lblas -llapack -lnetcdff
 
 
 
@@ -39,7 +40,8 @@ SRCS = test_special_functions.f90    \
        test_mesh.f90                 \
        test_matrix.f90               \
        load_love_numbers.f90         \
-       tide_love_numbers.f90
+       tide_love_numbers.f90         \
+       netcdf_test.f90
 
 
 ###########################################################

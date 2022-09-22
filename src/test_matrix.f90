@@ -10,6 +10,7 @@ program test_matrix
   use module_force
   implicit none
 
+
   logical :: spectop,ibnd,found
   integer(i4b) :: ngll,nspec,inode,ispec,ilayer,nlayers, &
                   isection,i,count,ndim,l,isection1,ilayer1, &

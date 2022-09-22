@@ -8,17 +8,14 @@ program load_love_numbers
   use module_mesh
   use module_matrix
   use module_force
+  use module_linear_solver
   implicit none
 
   character(len=:), allocatable :: model_file,output_file
-  integer(i4b) :: lmax,ngll,l,ndim,kd,ldab,isection, &
-                  ilayer,ispec,inode,i,info,io
-  real(dp) :: drmax,u,v,p,g
-  real(dp), dimension(:,:), allocatable :: b
+  integer(i4b) :: lmax,l,io
   type(spherical_model), allocatable :: model
-  type(spherical_model_mesh) :: mesh
-  type(radial_matrix) :: tormat,sphmat
-
+  type(love_number), dimension(:), allocatable :: lln
+ 
   ! get the inputs
   call check_arguments(2,'-lmax [lmax], -f [output file]',1,'-m [model file]')
   if (.not. found_command_argument('-lmax',lmax)) stop 'lmax not set'
@@ -28,61 +25,20 @@ program load_love_numbers
   else
      model = elastic_PREM(.false.)     
   end if
-  
-  ! build the mesh
-  drmax = 0.1_dp*model%r2/(lmax+1)
-  ngll = 5
-  mesh = spherical_mesh(ngll,model,drmax)
 
+  allocate(lln(0:lmax))
+
+  call make_love_numbers(model,lmax,lln = lln)
   
   ! loop over the degrees
   open(newunit = io,file=trim(output_file))
   do l = 1,lmax
-     
-     ! build the matrix
-     sphmat = build_spheroidal_matrix(mesh,l)
-     
-     ! set the RHS
-     ndim = sphmat%ndim
-     kd = sphmat%kd
-     ldab = sphmat%ldab
-     if(allocated(b)) deallocate(b); allocate(b(ndim,1))
-     b = 0.0_dp
-
-     isection = mesh%nsections
-     ilayer = mesh%section(isection)%nlayers
-     associate(layer => mesh%section(isection)%layer(ilayer),         &
-               ibool => sphmat%ibool%section(isection)%layer(ilayer))
-
-       call force_for_unit_harmonic_load(layer,ibool,l,b)
-
-       ! solve the linear system
-       call dpbtrs('U',ndim,kd,1,sphmat%a,ldab,b,ndim,info)
-       call error(info /= 0,'test_matrix','problem with spheroidal substitution')  
-
- 
-       inode = layer%ngll
-       ispec = layer%nspec
-       g = layer%g(inode,ispec)
-       i = ibool%get(1,inode,ispec)
-       u = b(i,1)
-       i = ibool%get(2,inode,ispec)
-       v = b(i,1)
-       if(l > 1) then
-          i = ibool%get(3,inode,ispec)
-          p = b(i,1)/g
-       else
-          p = 0.0_dp
-       end if
-
-       
-       write(io,'(i6,3e20.8)') l,u*length_norm, &
-                                 v*length_norm, &
-                                 p*length_norm
-       
-     end associate
-
-     
+            
+     write(io,'(i6,4e20.8)') l,lln(l)%ku*length_norm, &
+                               lln(l)%kv*length_norm, &
+                               lln(l)%kw*length_norm, &          
+                               lln(l)%kp*gravitational_potential_norm
+            
   end do
   close(io)
   
