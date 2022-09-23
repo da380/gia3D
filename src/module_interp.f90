@@ -55,8 +55,8 @@ module module_interp
   contains
     procedure :: set => set_interp_2D
     procedure :: delete => delete_interp_2D
-!    procedure :: find   => find_interp_2D
-!    procedure :: f    => value_interp_2D    
+    procedure :: find   => find_interp_2D
+    procedure :: f    => value_interp_2D    
  end type interp_2D
 
  
@@ -109,11 +109,12 @@ contains
     return
   end subroutine set_interp_1D
 
-  integer(i4b) function find_interp_1D(self,x)
+  subroutine find_interp_1D(self,x,i)
     use module_util, only: bisect_list,hunt_list
     implicit none
     class(interp_1D) :: self
     real(dp), intent(in) :: x
+    integer(i4b), intent(out) :: i
 
     integer(i4b) :: il,iu,im,n
 
@@ -123,14 +124,14 @@ contains
     end if
 
     ! find the point
-    find_interp_1D = hunt_list(self%xx,x,self%i_save)
+    i = hunt_list(self%xx,x,self%i_save)
 
     ! _save the previous values
-    self%i_save = find_interp_1D
+    self%i_save = i
     self%x_save = x
     
     return
-  end function find_interp_1D
+  end subroutine find_interp_1D
 
   function value_interp_1D(self,x) result(f)
     implicit none
@@ -140,7 +141,7 @@ contains
     integer(i4b) :: i
     real(dp) :: x1,x2,f1,f2,f
     
-    i  = self%find(x)
+    call self%find(x,i)
     x1 = self%xx(i)
     x2 = self%xx(i+1)
 
@@ -260,7 +261,7 @@ contains
 
     
     ! get the indices and points
-    i1 = self%find(x)
+    call self%find(x,i1)
     i2 = i1+1
 
     ! compute some parameters
@@ -381,7 +382,8 @@ contains
     return
   end subroutine set_interp_2D
 
-
+ 
+    
   subroutine delete_interp_2D(self)
     implicit none
     class(interp_2D) :: self
@@ -389,6 +391,110 @@ contains
     self%built = .false.    
     return
   end subroutine delete_interp_2D
+
+
+  subroutine find_interp_2D(self,x,y,ix,iy)
+    use module_util, only: bisect_list,hunt_list
+    implicit none
+    class(interp_2D) :: self
+    real(dp), intent(in) :: x,y
+    integer(i4b), intent(out) :: ix,iy
+
+    integer(i4b) :: il,iu,im,n
+
+    ! is it worth hunting? 
+    if(self%ix_save /= 0 .and. abs(x-self%x_save) > self%dx_save) then
+       self%ix_save = 0
+    end if
+
+    ! find the point in x
+    ix = hunt_list(self%xx,x,self%ix_save)
+
+    ! is it worth hunting? 
+    if(self%iy_save /= 0 .and. abs(y-self%y_save) > self%dy_save) then
+       self%iy_save = 0
+    end if
+
+    ! find the point in y
+    iy = hunt_list(self%yy,y,self%iy_save)
+
+
+
+    ! _save the previous values
+    self%ix_save = ix
+    self%x_save = x
+    self%iy_save = iy
+    self%y_save = y
+    
+    return
+  end subroutine find_interp_2D
+  
+  real(dp) function value_interp_2D(self,x,y) result(f)
+    implicit none
+    class(interp_2D) :: self
+    real(dp), intent(in) :: x,y
+    
+    integer(i4b) :: ix,iy
+    real(dp) :: x1,x2,y1,y2,f1,f2,f3,f4,s,t
+    
+    call self%find(x,y,ix,iy)
+    f =  bilinear_interp_calculation(self%xx,self%yy,self%ff,ix,iy,x,y) 
+    
+    return
+  end function value_interp_2D
+
+
+  real(dp) function bilinear_interp(xx,yy,ff,x,y,ix,iy) result(f)
+    use module_util
+    implicit none
+    real(dp), dimension(:), intent(in) :: xx,yy
+    real(dp), dimension(:,:), intent(in) :: ff
+    real(dp), intent(in) :: x,y
+    integer(i4b), intent(inout), optional :: ix,iy
+
+    integer(i4b) :: jx,jy
+    real(dp) :: x1,x2,y1,y2,f1,f2,f3,f4,s,t
+    
+    ! locate the indices
+    if(present(ix) .and. present(iy)) then
+       jx = hunt_list(xx,x,ix)
+       jy = hunt_list(yy,y,iy)
+       ix = jx
+       iy = jy
+    else
+       jx = hunt_list(xx,x,0)
+       jy = hunt_list(yy,y,0)       
+    end if
+
+    f =  bilinear_interp_calculation(xx,yy,ff,ix,iy,x,y) 
+    
+    return
+  end function bilinear_interp
+
+
+  real(dp) function bilinear_interp_calculation(xx,yy,ff,ix,iy,x,y) result(f)
+    real(dp), dimension(:), intent(in) :: xx,yy
+    real(dp), dimension(:,:), intent(in) :: ff
+    integer(i4b), intent(in) :: ix,iy
+    real(dp), intent(in) :: x,y
+    real(dp) :: s,t,x1,x2,y1,y2,f1,f2,f3,f4
+
+    x1 = xx(ix)
+    x2 = xx(ix+1)
+    y1 = yy(iy)
+    y2 = yy(iy+1)
+
+    f1 = ff(ix,iy)
+    f2 = ff(ix+1,iy)
+    f3 = ff(ix+1,iy+1)
+    f4 = ff(ix,iy+1)
+    
+    s = (x-x1)/(x2-x1)
+    t = (y-y1)/(y2-y1)
+    f = (1-s)*(1-t)*f1 + s*(1-t)*f2 + s*t*f3 + (1-s)*t*f4
+    
+    return
+  end function bilinear_interp_calculation
   
 end module module_interp
 
