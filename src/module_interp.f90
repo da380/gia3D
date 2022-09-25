@@ -14,7 +14,7 @@ module module_interp
      real(dp) :: x_save,dx_save
      real(dp) :: fp_save
    contains
-     procedure :: set    => set_interp_1D
+     procedure :: set => set_interp_1D
      procedure :: delete => delete_interp_1D
      procedure :: find   => find_interp_1D
      procedure :: f    => value_interp_1D
@@ -26,9 +26,15 @@ module module_interp
   
   type, extends(interp_1D) :: interp_1D_cubic
      private
+     logical :: lnat = .true.
+     logical :: rnat = .true.
+     logical :: lset = .false.
+     logical :: rset = .false.
+     real(dp) :: lfp,rfp
      real(dp), dimension(:), allocatable :: ff2
      real(dp) :: fpp_save
    contains
+     procedure :: parms => parameters_cubic_spline
      procedure :: set => set_interp_1D_cubic
      procedure :: delete => delete_interp_1D_cubic
      procedure :: f => value_interp_1D_cubic
@@ -58,6 +64,15 @@ module module_interp
     procedure :: find   => find_interp_2D
     procedure :: f    => value_interp_2D    
  end type interp_2D
+
+
+  type, extends(interp_2D) :: interp_2D_bicubic_spline
+     type(interp_1D_cubic), dimension(:), allocatable :: cs
+   contains
+     procedure :: set => set_interp_2D_bicubic_spline
+    procedure :: delete => delete_interp_2D_bicubic_spline
+    procedure :: f    => value_interp_2D_bicubic_spline    
+ end type interp_2D_bicubic_spline
 
  
 contains
@@ -183,6 +198,31 @@ contains
   !              routines for cubic spline interpolation             !
   !==================================================================!
 
+  subroutine parameters_cubic_spline(self,lnat,lfp,rnat,rfp)
+    class(interp_1D_cubic), intent(inout) :: self
+    logical, intent(in), optional :: lnat,rnat
+    real(dp), intent(in), optional :: lfp,rfp
+    if(present(lnat)) then
+       self%lnat = lnat
+       self%lset = .false.
+    end if
+    if(present(lfp)) then
+       self%lnat = .false.
+       self%lset = .true.
+       self%lfp = lfp
+    end if
+    if(present(rnat)) then
+       self%rnat = rnat
+       self%rset = .false.
+    end if
+    if(present(rfp)) then
+       self%rnat = .false.
+       self%rset = .true.
+       self%rfp = rfp
+    end if
+    return
+  end subroutine parameters_cubic_spline
+  
 
   subroutine set_interp_1D_cubic(self,xx,ff)
 
@@ -193,6 +233,7 @@ contains
     implicit none
     class(interp_1D_cubic) :: self
     real(dp), dimension(:), intent(in) :: xx,ff
+
 
     integer(i4b) :: i,n,info
     real(dp), dimension(:), allocatable :: dl,d,du
@@ -208,7 +249,11 @@ contains
     allocate(dl(n-1),d(n),du(n-1),b(n,1))
 
     ! upper diagonal
-    du(1) = 0.0_dp
+    if(self%lnat) then
+       du(1) = 0.0_dp
+    else
+       du(1) = (xx(2)-xx(1))/6.0_dp
+    end if
     do i = 2,n-1
        du(i) = (xx(i+1)-xx(i))/6.0_dp
     end do
@@ -217,7 +262,11 @@ contains
     do i = 2,n-1
        dl(i-1) = (xx(i)-xx(i-1))/6.0_dp       
     end do
-    dl(n-1) = 0.0_dp
+    if(self%rnat) then
+       dl(n-1) = 0.0_dp
+    else
+       dl(n-1) = (xx(n)-xx(n-1))/6.0_dp
+    end if
 
     ! diagonal and right hand side
     do i = 2,n-1
@@ -225,12 +274,29 @@ contains
        b(i,1) =  (ff(i+1)-ff(i))/(xx(i+1)-xx(i)) &
                 -(ff(i)-ff(i-1))/(xx(i)-xx(i-1))
     end do
-
-    ! fix the boundary conditions
-    b(1,1) = 0.0_dp
-    b(n,1) = 0.0_dp
-    d(1) = 1.0_dp
-    d(n) = 1.0_dp
+    if(self%lnat) then
+       d(1) = 1.0_dp
+       b(1,1) = 0.0_dp
+    else
+       d(1) = (xx(2)-xx(1))/3.0_dp
+       if(self%lset) then
+          b(1,1) = (ff(2)-ff(1))/(xx(2)-xx(1)) - self%lfp
+       else
+          b(1,1) = 0.0_dp
+       end if
+    end if
+    if(self%rnat) then
+       d(n) = 1.0_dp
+       b(n,1) = 0.0_dp
+    else
+       d(n) = -(xx(n)-xx(n-1))/3.0_dp
+       if(self%rset) then
+          b(1,1) = (ff(n)-ff(n-1))/(xx(n)-xx(n-1)) - self%rfp
+       else
+          b(1,1) = 0.0_dp
+       end if
+    end if
+    
     
     ! solve the tridiagonal system
     call dgtsv (n, 1, dl, d, du, b, n, info)
@@ -341,6 +407,7 @@ contains
     class(interp_2D) :: self
     real(dp), dimension(:), intent(in) :: xx,yy
     real(dp), dimension(:,:), intent(in) :: ff
+
     
     integer(i4b) :: nx,ny,i,j
     
@@ -353,14 +420,26 @@ contains
     
     ! check the arrays are consecutive
     j = 0
-    do i = 1,nX-1
+    do i = 1,nx-1
        if(xx(i+1) >  xx(i)) then
           j = j+1
        else if(xx(i+1) > xx(i)) then
           j = j-1
        end if
     end do
-    call error(j /= nx-1 .and. j /= -nx+1,'set_linear_interp_1D','x-array not consecutive')
+    call error(j /= nx-1 .and. j /= -nx+1,'set_linear_interp_2D','x-array not consecutive')
+
+
+    ! check the arrays are consecutive
+    j = 0
+    do i = 1,ny-1
+       if(yy(i+1) >  yy(i)) then
+          j = j+1
+       else if(yy(i+1) > yy(i)) then
+          j = j-1
+       end if
+    end do
+    call error(j /= ny-1 .and. j /= -ny+1,'set_linear_interp_2D','y-array not consecutive')
 
     
     ! store the dimensions
@@ -381,6 +460,7 @@ contains
     
     return
   end subroutine set_interp_2D
+
 
  
     
@@ -418,8 +498,6 @@ contains
     ! find the point in y
     iy = hunt_list(self%yy,y,self%iy_save)
 
-
-
     ! _save the previous values
     self%ix_save = ix
     self%x_save = x
@@ -437,7 +515,7 @@ contains
     integer(i4b) :: ix,iy
     real(dp) :: x1,x2,y1,y2,f1,f2,f3,f4,s,t
     
-    call self%find(x,y,ix,iy)
+    call self%find(x,y,ix,iy)    
     f =  bilinear_interp_calculation(self%xx,self%yy,self%ff,ix,iy,x,y) 
     
     return
@@ -465,7 +543,7 @@ contains
        jx = hunt_list(xx,x,0)
        jy = hunt_list(yy,y,0)       
     end if
-
+    
     f =  bilinear_interp_calculation(xx,yy,ff,ix,iy,x,y) 
     
     return
@@ -495,6 +573,68 @@ contains
     
     return
   end function bilinear_interp_calculation
+
+
+  !==================================================================!
+  !                   routines for 2D bicubic spline                 !
+  !==================================================================!
+
+
+  subroutine set_interp_2D_bicubic_spline(self,xx,yy,ff)
+    implicit none
+    class(interp_2D_bicubic_spline) :: self
+    real(dp), dimension(:), intent(in) :: xx,yy
+    real(dp), dimension(:,:), intent(in) :: ff
+    
+    integer(i4b) :: i
+
+    ! set up the basic type information
+    call self%interp_2D%set(xx,yy,ff)
+
+    ! build cubic splines along each column
+    
+    allocate(self%cs(self%ny))
+    do i = 1,self%ny
+       call self%cs(i)%set(xx,ff(:,i))	
+    end do
+    
+    return
+  end subroutine set_interp_2D_bicubic_spline
+
+
+  subroutine delete_interp_2D_bicubic_spline(self)
+    implicit none
+    integer(i4b) :: i,n
+    class(interp_2D_bicubic_spline) :: self
+    deallocate(self%xx,self%yy,self%ff,self%cs)    
+    self%built = .false.    
+    return
+  end subroutine delete_interp_2D_bicubic_spline
+
+
+  real(dp) function value_interp_2D_bicubic_spline(self,x,y) result(f)
+    implicit none
+    class(interp_2D_bicubic_spline) :: self
+    real(dp), intent(in) :: x,y
+    
+    integer(i4b) :: i
+    real(dp), dimension(self%ny) :: g
+    type(interp_1D_cubic) :: gs
+
+    ! build temporary array for the given x
+    do i = 1,self%ny
+       g(i) = self%cs(i)%f(x)
+    end do
+
+    ! form the temporary cubic spline
+    call gs%set(self%yy,g)
+
+    ! evaluate the spline to get the result
+    f = gs%f(y)
+
+    
+    return
+  end function value_interp_2D_bicubic_spline
   
 end module module_interp
 

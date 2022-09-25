@@ -2,6 +2,7 @@ module module_spherical_harmonics
   
   use module_constants
   use module_special_functions
+  use module_interp
   use, intrinsic :: iso_c_binding
 
   !===============================================================!
@@ -80,7 +81,7 @@ module module_spherical_harmonics
      procedure :: saxpy_gauss_legendre_field
      procedure :: real_saxpy_gauss_legendre_field          
      generic   :: saxpy => saxpy_gauss_legendre_field,     &
-                           real_saxpy_gauss_legendre_field
+                  real_saxpy_gauss_legendre_field
   end type gauss_legendre_field
 
   type, extends(gauss_legendre_field) :: scalar_gauss_legendre_field
@@ -976,6 +977,7 @@ contains
     call daxpy(self%rdim,a,other%rdata,1,self%rdata,1)
     return
   end subroutine real_saxpy_gauss_legendre_field
+
 
   
   !------------------------------------------------------!
