@@ -25,10 +25,10 @@ contains
     g = layer%g(inode,ispec)
     r = layer%r(inode,ispec)
     i = ibool%get(1,inode,ispec)
-    b(i,1) = -g*r*r/load_norm
+    b(i,1) = -g*r*r
     if(l > 1) then
        i = ibool%get(3,inode,ispec)
-       b(i,1) = -r*r/load_norm
+       b(i,1) = -r*r
     end if
     return
   end subroutine force_for_unit_harmonic_load

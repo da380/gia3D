@@ -56,9 +56,9 @@ contains
     if(present(comp)) then
        complement = comp
     else
-       complement  = .true.
+       complement  = .false.
     end if
-    where(rho_water*sl%rdata - rho_ice*ice%rdata <= 0.0_dp .eqv. .not.complement)
+    where(rho_water*sl%rdata - rho_ice*ice%rdata <= 0.0_dp .eqv. complement)
        fun%rdata = 0.0_dp
     end where    
     return

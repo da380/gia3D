@@ -11,14 +11,14 @@ program sea_level_fingerprint
   implicit none
 
   logical :: found
-  integer(i4b) :: lmax,ith,iph,io,l,m
-  real(dp) :: th,ph,f,th1,th2,g,int,area,fac
+  integer(i4b) :: lmax,ith,iph,io,l,m,it
+  real(dp) :: th,ph,f,th1,th2,g,int,area,fac,eps
   complex(dpc) :: ctmp
 
   type(spherical_model), allocatable :: model
   type(gauss_legendre_grid) :: grid
   type(love_number), dimension(:), allocatable :: lln,tln
-  type(real_scalar_gauss_legendre_field) :: ice1,sl1,ice2,sl2,sigma
+  type(real_scalar_gauss_legendre_field) :: ice1,sl1,ice2,sl2,sigma,sls,ofun
   type(real_scalar_spherical_harmonic_expansion) :: sigma_lm
 
   
@@ -40,7 +40,9 @@ program sea_level_fingerprint
   call  sl1%allocate(grid)
   call ice2%allocate(grid)
   call  sl2%allocate(grid)
+  call  sls%allocate(grid)
   call sigma%allocate(grid)
+  call ofun%allocate(grid)
 
   ! allocate spherical harmonic expansions
   call sigma_lm%allocate(grid)
@@ -61,31 +63,41 @@ program sea_level_fingerprint
   ! set the initial guess for the new sea level
   sl2 = sl1
 
+  do it = 1,10
 
-  ! compute the load
-  call load(sl1,ice1,sl2,ice2,sigma)
-  call grid%SH_trans(sigma,sigma_lm)
+     ! store the old sea level
+     sls%rdata = sl2%rdata
+     
+     ! compute the load
+     call load(sl1,ice1,sl2,ice2,sigma)
+     call grid%SH_trans(sigma,sigma_lm)
+     
+     ! force mass conservation
+     area = ocean_area(grid,sl2,ice2)
+     int = sigma%integrate(grid)
+     sl2%rdata = sl2%rdata - int/(rho_water*area)
+  
+     ! updae the sea level
+     call sigma_lm%filter(-lln(:)%ku - lln%kp/g)
+     call grid%SH_itrans(sigma_lm,sigma)
+     sl2%rdata =  sl1%rdata + sigma%rdata
 
-  ! get the sea level
-  call sigma_lm%filter(-lln(:)%ku - lln%kp/g)
-  call grid%SH_itrans(sigma_lm,sigma)
-  sl2%rdata =  sl2%rdata + sigma%rdata
+     ! estimate the error
+     eps = maxval(abs(sl2%rdata-sls%rdata))/maxval(abs(sl2%rdata))
+     
+     print *, eps
 
-  ! compute the new load
-  call load(sl1,ice1,sl2,ice2,sigma)
-  area = ocean_area(grid,sl2,ice2)
-  int = sigma%integrate(grid)
-  sl2%rdata = sl2%rdata - int/(rho_water*area)
-  
-  
-  
+  end do
+
+
+  call ocean_function(sl2,ice2,ofun)
   
   ! write out the new sea level
   open(newunit = io,file='sl.out')
   write(io,*) grid%nth,grid%nph,0
   do ith = 1,grid%nth
      do iph = 1,grid%nph
-        write(io,*) grid%ph(iph),grid%th(ith),(sl2%get(iph,ith)-sl1%get(iph,ith))*length_norm
+        write(io,*) grid%ph(iph),grid%th(ith),ofun%get(iph,ith)*(sl2%get(iph,ith)-sl1%get(iph,ith))*length_norm
      end do
   end do
   
@@ -99,23 +111,33 @@ contains
     real(dp), intent(in) :: ph
     real(dp), intent(in) :: th
 
-    real(dp), parameter :: amp  = 0.5_dp
+    real(dp), parameter :: amp1  = 0.3_dp
+    real(dp), parameter :: amp2  = 0.1_dp
     real(dp), parameter :: th1  = 20.0_dp*deg2rad
     real(dp), parameter :: th2  = 30.0_dp*deg2rad
-    real(dp), parameter :: sl1  = -1000.0_dp/length_norm
+    real(dp), parameter :: th3  = 140.0_dp*deg2rad
+    real(dp), parameter :: th4  = 160.0_dp*deg2rad
+    real(dp), parameter :: sl1  = -100.0_dp/length_norm
     real(dp), parameter :: sl2  =  3000.0_dp/length_norm
+    real(dp), parameter :: sl3  = -10.0_dp/length_norm
 
-    real(dp) :: th11,th22
+    real(dp) :: th11,th22,th33,th44
 
-    th11 = th1*(1.0_dp+amp*sin(4.0_dp*ph))
-    th22 = th2*(1.0_dp+amp*sin(4.0_dp*ph))
+    th11 = th1*(1.0_dp+amp1*sin(4.0_dp*ph))
+    th22 = th2*(1.0_dp+amp1*sin(4.0_dp*ph))
+    th33 = th3*(1.0_dp+amp2*cos(5.0_dp*ph))
+    th44 = th4*(1.0_dp+amp2*cos(5.0_dp*ph))
     
     if(th <= th11) then
        sl = sl1
     else if(th > th11 .and. th < th22) then
        sl = sl1 + (th-th11)*(sl2-sl1)/(th22-th11)
-    else
+    else if(th >= th22 .and. th < th33) then
        sl = sl2
+    else if(th >= th33 .and. th < th44) then
+       sl = sl2 + (th-th33)*(sl3-sl2)/(th44-th33)
+    else
+       sl = sl3
     end if
     
     return
@@ -128,9 +150,13 @@ contains
 
     real(dp), parameter :: th1   = 18.0_dp*deg2rad
     real(dp), parameter :: th2   = 20.0_dp*deg2rad
-    real(dp), parameter :: ice1  = 1000.0_dp/length_norm
+    real(dp), parameter :: ice1  = 10000.0_dp/length_norm
     real(dp), parameter :: ice2  =    0.0_dp/length_norm 
 
+    if(ph > pi .or. ph < 0.8*pi ) then
+       ice = 0.0_dp
+       return
+    end if
     if(th <= th1) then
        ice = ice1
     else if(th > th1 .and. th < th2) then
