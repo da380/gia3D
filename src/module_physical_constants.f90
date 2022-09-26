@@ -23,5 +23,9 @@ module module_physical_constants
   ! values for some useful physical constants in SI units
   real(dp), parameter :: bigg = 6.6743e-11_dp/gravitational_constant_norm
 
+  ! density of ice and water
+  real(dp), parameter :: rho_ice = 917.0_dp/density_norm
+  real(dp), parameter :: rho_water = 1000.0_dp/density_norm
+
   
 end module module_physical_constants

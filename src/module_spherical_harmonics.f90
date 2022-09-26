@@ -98,6 +98,7 @@ module module_spherical_harmonics
      procedure :: set => set_real_scalar_gauss_legendre_field
      procedure :: get => get_real_scalar_gauss_legendre_field
      procedure :: harmonic => harmonic_real_scalar_gauss_legendre_field
+     procedure :: integrate => integrate_real_scalar_gauss_legendre_field
   end type real_scalar_gauss_legendre_field
 
 
@@ -1057,6 +1058,8 @@ contains
     return
   end subroutine set_real_scalar_gauss_legendre_field
 
+  
+
   function get_real_scalar_gauss_legendre_field(self,iph,ith) result(val)
     implicit none
     class(real_scalar_gauss_legendre_field), intent(in) :: self
@@ -1088,6 +1091,28 @@ contains
     end do
     return
   end subroutine harmonic_real_scalar_gauss_legendre_field
+
+  
+  real(dp) function integrate_real_scalar_gauss_legendre_field(self,grid) result(int)
+    implicit none
+    class(real_scalar_gauss_legendre_field), intent(in) :: self
+    class(gauss_legendre_grid), intent(in) :: grid
+    integer(i4b) :: nth,nph,ith,i1,i2
+    real(dp) :: w,tmp    
+    int = 0.0_dp    
+    nth = grid%nth
+    nph = grid%nph        
+    i2 = 0
+    do ith = 1,nth
+       i1 = i2+1
+       i2 = i1+nph-1
+       tmp = sum(self%rdata(i1:i2))
+       w = grid%w(ith)*twopi/nph
+       int = int + tmp*w
+    end do
+    return
+  end function integrate_real_scalar_gauss_legendre_field
+  
   
 
   ! vector fields

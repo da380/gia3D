@@ -19,15 +19,16 @@ contains
     integer(i4b), intent(in) :: l
     real(dp), dimension(:,:), intent(inout) :: b
     integer(i4b) :: i,inode,ispec
-    real(dp) :: g
+    real(dp) :: g,r
     inode = layer%ngll
     ispec = layer%nspec
     g = layer%g(inode,ispec)
+    r = layer%r(inode,ispec)
     i = ibool%get(1,inode,ispec)
-    b(i,1) = -g/load_norm
+    b(i,1) = -g*r*r/load_norm
     if(l > 1) then
        i = ibool%get(3,inode,ispec)
-       b(i,1) = -1.0_dp/load_norm
+       b(i,1) = -r*r/load_norm
     end if
     return
   end subroutine force_for_unit_harmonic_load
@@ -40,14 +41,15 @@ contains
     complex(dpc), dimension(l+1), intent(in) :: sigma
     real(dp), dimension(:,:), intent(inout) :: b
     integer(i4b) :: i,j,inode,ispec
-    real(dp) :: g
+    real(dp) :: g,r
     inode = layer%ngll
     ispec = layer%nspec
     g = layer%g(inode,ispec)
+    r = layer%r(inode,ispec)
     i = ibool%get(1,inode,ispec)
-    b(i,1)         = -g*real(sigma(1))
-    b(i,2:l+1)     = -g*real(sigma(2:l+1))
-    b(i,l+2:2*l+1) = -g*imag(sigma(2:l+1))
+    b(i,1)         = -g*r*r*real(sigma(1))
+    b(i,2:l+1)     = -g*r*r*real(sigma(2:l+1))
+    b(i,l+2:2*l+1) = -g*r*r*imag(sigma(2:l+1))
     if(l > 1) then
        j = ibool%get(3,inode,ispec)
        b(j,:) = b(i,:)/g

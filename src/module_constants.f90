@@ -14,6 +14,11 @@ module module_constants
 
   ! imaginary unit
   complex(dpc), parameter :: ii=(0.0_dp,1.0_dp)
+
+
+  ! default string length
+  integer(i4b), parameter :: max_string_length = 4096
+  
   
   ! useful mathematical constants
   
@@ -40,6 +45,10 @@ module module_constants
   real(dp), parameter :: ifourpi  = 0.0795774715459476678844418816862571810172298228702282243738336720_dp
   real(dp), parameter :: sifourpi = 0.2820947917738781434740397257803862929220253146644994284220428608_dp
   real(dp), parameter :: log2     = 0.6931471805599453094172321214581765680755001343602552541206800094_dp
+
+
+
+
   
   ! conversion between radians and degrees
   real(sp), parameter :: deg2rad_sp = 0.0174532925199432957692369076848861271344287188854172545609719144_sp
@@ -56,7 +65,6 @@ module module_constants
   real(dp), parameter :: yr2sec = 60.0_dp*60.0_dp*24.0_dp*365.25_dp
   real(dp), parameter :: sec2yr = 1.0_dp/yr2sec  
 
-  ! default string length
-  integer(i4b), parameter :: max_string_length = 1024
+
   
 end module module_constants

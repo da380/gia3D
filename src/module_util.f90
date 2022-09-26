@@ -156,7 +156,7 @@ contains
     implicit none
     integer, intent(IN) :: io
     character(len=:), allocatable :: line
-    integer, parameter :: buf_len= 1024*4
+    integer, parameter :: buf_len= max_string_length
     character(len=buf_len) :: buf
     logical :: okay, set
     integer status, size    
@@ -211,8 +211,8 @@ contains
   logical function found_command_argument_character(tag,val) result(found)
     character(len=*), intent(in) :: tag
     character(len=:), allocatable, intent(out) :: val
-    character(len=1028) :: rtag,string
-    integer(i4b) :: narg,iarg,jarg    
+    character(len=max_string_length) :: rtag,string
+    integer(i4b) :: narg,iarg,jarg
     narg = command_argument_count()
     if(mod(narg,2) /= 0) then
        stop 'found_command_argument: number of arguments needs to be divisible by two'
@@ -234,7 +234,7 @@ contains
   logical function found_command_argument_integer(tag,val) result(found)
     character(len=*), intent(in) :: tag
     integer(i4b), intent(out) :: val
-    character(len=1028) :: rtag,string
+    character(len=max_string_length) :: rtag,string
     integer(i4b) :: narg,iarg,jarg,ios
     narg = command_argument_count()
     if(mod(narg,2) /= 0) then
@@ -263,7 +263,7 @@ contains
   logical function found_command_argument_real(tag,val) result(found)
     character(len=*), intent(in) :: tag
     real(dp), intent(out) :: val
-    character(len=1028) :: rtag,string
+    character(len=max_string_length) :: rtag,string
     integer(i4b) :: narg,iarg,jarg,ios
     narg = command_argument_count()
     if(mod(narg,2) /= 0) then

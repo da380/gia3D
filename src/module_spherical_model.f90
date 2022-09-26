@@ -30,6 +30,7 @@ module module_spherical_model
      integer(i4b) :: nsections = 0
      class(spherical_section), dimension(:), allocatable :: section
    contains
+     procedure :: g => surface_gravity_spherical_model
      procedure :: write_elastic => write_elastic_spherical_model
      procedure :: write_maxwell => write_maxwell_spherical_model
      procedure :: write_anelastic => write_anelastic_spherical_model
@@ -161,6 +162,34 @@ module module_spherical_model
 contains
 
 
+  real(dp)  function surface_gravity_spherical_model(self) result(g)
+    use module_quadrature
+    class(spherical_model), intent(in) :: self
+    integer(i4b), parameter :: n = 5
+    integer(i4b) :: isection,ilayer,i
+    real(dp) :: r1,r2,r,w
+    type(gauss_quadrature) :: quad
+    call quad%set(n)   
+    g = 0.0_dp
+    do isection = 1,self%nsections
+       do ilayer = 1,self%section(isection)%nlayers
+          associate(layer => self%section(isection)%layer(ilayer))
+            r1 = layer%r1
+            r2 = layer%r2
+            call quad%trans(r1,r2)
+            do i = 1,n
+               r = quad%x(i)
+               w = quad%w(i)
+               g = g + layer%rho(r)*r*r*w
+            end do
+          end associate
+       end do
+    end do
+    g = 4.0_dp*pi*g*bigg/(self%r2**2)
+    return
+  end function surface_gravity_spherical_model
+
+  
   !--------------------------------------------!
   !              elastic procedures            !
   !--------------------------------------------!

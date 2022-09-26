@@ -1,5 +1,5 @@
 #################################################
-#             define directory paths            #
+#           set parameters and options          #
 #################################################
 MOD=../mod/
 LOBJ=../obj/
@@ -9,19 +9,20 @@ VPATH = $(BIN):$(LOBJ)
 # set the compiler 
 F95 = gfortran
 
-
-# fftw3 f90 location
+# fftw3 f90 api location
 FFTW3 = /home/david/lib/fftw-3.3.3/api
+
+# netcdf.mod location
 NETCDF = /usr/include/
 
 # set the flags
 FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3) -I$(NETCDF)
 
-
 # libraries to link to
 LIBS =  -lfftw3 -lblas -llapack -lnetcdff
 
-
+# compile the testing programs? 
+TEST=true
 
 # set some parameters
 MV=mv -f
@@ -30,18 +31,23 @@ MV=mv -f
 #####################################################
 #             list of excutable programs            #
 #####################################################
-SRCS = test_special_functions.f90    \
-       test_interp.f90               \
-       test_quadrature.f90           \
-       test_fftw3.f90                \
-       test_spherical_harmonics.f90  \
-       test_wigner.f90               \
-       test_spherical_model.f90      \
-       test.f90                      \
-       test_mesh.f90                 \
-       test_matrix.f90               \
-       love_numbers.f90              \
-       netcdf_test.f90
+
+# main programs
+SRCS = love_numbers.f90          \
+       sea_level_fingerprint.f90 
+
+# add in testing programs if desired
+SRCS += test_special_functions.f90    \
+        test_interp.f90               \
+        test_quadrature.f90           \
+        test_fftw3.f90                \
+        test_spherical_harmonics.f90  \
+        test_wigner.f90               \
+        test_spherical_model.f90      \
+        test.f90                      \
+        test_mesh.f90                 \
+        test_matrix.f90               \
+        netcdf_test.f90
 
 
 ###########################################################
@@ -62,12 +68,12 @@ MOD_SRCS = module_constants.f90            \
            module_mesh.f90                 \
 	   module_matrix.f90               \
            module_force.f90                \
-           module_linear_solver.f90
+           module_linear_solver.f90        \
+           module_sea_level.f90
 
 
 ###########################################################
-# These sections should not need to be edited unless a    #
-#program needs non-standard files to be linked            #
+#       These sections should not need to be edited       #
 ###########################################################
 
 
@@ -75,7 +81,7 @@ MOD_SRCS = module_constants.f90            \
 EXCT     = $(SRCS:%.f90=%)
 OBJS     = $(SRCS:%.f90=$(LOBJ)%.o)
 MOD_OBJS = $(MOD_SRCS:%.f90=$(LOBJ)%.o)
-BINEXCT     = $(EXCT:%=$(BIN)%)
+BINEXCT  = $(EXCT:%=$(BIN)%)
 
 
 all: $(EXCT) 

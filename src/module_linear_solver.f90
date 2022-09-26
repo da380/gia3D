@@ -9,20 +9,18 @@ module module_linear_solver
   implicit none
 
   type love_number
-     integer(i4b) :: l = 0
      real(dp) :: ku = 0.0_dp
      real(dp) :: kv = 0.0_dp
-     real(dp) :: kw = 0.0_dp
      real(dp) :: kp = 0.0_dp
   end type love_number
 
 contains
 
-  subroutine make_love_numbers(model,lmax,lln,tln)
+  subroutine make_love_numbers(model,l1,l2,lln,tln)
     type(spherical_model), intent(in) :: model
-    integer(i4b), intent(in) :: lmax
-    type(love_number), dimension(0:lmax), intent(out), optional :: lln
-    type(love_number), dimension(0:lmax), intent(out), optional :: tln
+    integer(i4b), intent(in) :: l1,l2
+    type(love_number), dimension(l1:l2), intent(out), optional :: lln
+    type(love_number), dimension(l1:l2), intent(out), optional :: tln
 
     integer(i4b) :: ngll,l,ndim,kd,ldab,isection,ilayer,info,inode,ispec,i
     real(dp) :: drmax,u,v,p
@@ -32,14 +30,16 @@ contains
     
     ! build the mesh
     ngll = 5
-    drmax = 0.1_dp*model%r2/(lmax+1)
+    drmax = 0.1_dp*model%r2/(l2+1)
     mesh = spherical_mesh(ngll,model,drmax)
 
     
     ! loop over the degrees    
-    do l = 1,lmax
-     
-     ! build the matrix
+    do l = l1,l2
+       
+       if(l == 0) cycle
+       
+       ! build the matrix
        sphmat = build_spheroidal_matrix(mesh,l)
        ndim = sphmat%ndim
        kd = sphmat%kd
@@ -70,7 +70,6 @@ contains
             end if            
           end associate
 
-          lln(l)%l  = l
           lln(l)%ku = u
           lln(l)%kv = v
           lln(l)%kp = p
@@ -101,7 +100,6 @@ contains
             end if            
           end associate
 
-          tln(l)%l  = l
           tln(l)%ku = u
           tln(l)%kv = v
           tln(l)%kp = p

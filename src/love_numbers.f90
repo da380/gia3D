@@ -1,5 +1,5 @@
 program love_numbers
- 
+  
   use module_constants
   use module_util
   use module_spherical_model
@@ -16,13 +16,15 @@ program love_numbers
   type(spherical_model), allocatable :: model
   type(love_number), dimension(:), allocatable :: ln
 
+
+  
   call check_arguments(1,'-lmax [maximum degree]', &
                        3,'-m [model file] &
                          &-lln [load love number file] &
                          &-tln [tidal love number file]')
   
   if (.not. found_command_argument('-lmax',lmax)) stop 'lmax not set'
-  allocate(ln(0:lmax))
+  allocate(ln(1:lmax))
   
   if(found_command_argument('-m',model_file)) then
      model = elastic_DECK(model_file)     
@@ -31,25 +33,23 @@ program love_numbers
   end if
 
   if (found_command_argument('-lln',output_file)) then
-     call make_love_numbers(model,lmax,lln = ln)
+     call make_love_numbers(model,1,lmax,lln = ln)
      open(newunit = io,file=trim(output_file))
      do l = 1,lmax
-        write(io,'(i6,4e20.8)') l,ln(l)%ku*length_norm, &
+        write(io,'(i6,3e20.8)') l,ln(l)%ku*length_norm, &
                                   ln(l)%kv*length_norm, &
-                                  ln(l)%kw*length_norm, &          
-                                  ln(l)%kp*gravitational_potential_norm
+                                  ln(l)%kp*gravitational_potential_norm        
      end do
      close(io)
   end if
 
 
   if (found_command_argument('-tln',output_file)) then
-     call make_love_numbers(model,lmax,tln = ln)
+     call make_love_numbers(model,1,lmax,tln = ln)
      open(newunit = io,file=trim(output_file))
      do l = 1,lmax
-        write(io,'(i6,4e20.8)') l,ln(l)%ku*length_norm, &
+        write(io,'(i6,3e20.8)') l,ln(l)%ku*length_norm, &
                                   ln(l)%kv*length_norm, &
-                                  ln(l)%kw*length_norm, &          
                                   ln(l)%kp*gravitational_potential_norm
      end do
      close(io)
