@@ -3,12 +3,12 @@ module module_spherical_model
   use module_constants  
   use module_physical_constants
   use module_error
+  use module_quadrature
   implicit none
 
   !========================================!
   !                basic types             !
   !========================================!
-
 
   type, abstract :: spherical_layer
      real(dp) :: r1
@@ -30,6 +30,7 @@ module module_spherical_model
      integer(i4b) :: nsections = 0
      class(spherical_section), dimension(:), allocatable :: section
    contains
+     procedure :: M => mass_spherical_model
      procedure :: g => surface_gravity_spherical_model
      procedure :: write_elastic => write_elastic_spherical_model
      procedure :: write_maxwell => write_maxwell_spherical_model
@@ -159,35 +160,75 @@ module module_spherical_model
   
 
 
+  !-------------------------------------------!
+  !            model_parameters type          !
+  !-------------------------------------------!
+  
+  type model_parameters
+     private
+     real(dp) ::  a_data = 6357.0_dp/length_norm
+     real(dp) ::  b_data = 6371.0_dp/length_norm
+     real(dp) ::  c_data = 6371.0_dp/length_norm
+     real(dp) ::  M_data = 5.972e24_dp/mass_norm
+     real(dp) ::  g_data = 9.807_dp/acceleration_norm
+     real(dp) :: Om_data = twopi/(24.0*3600.0_dp)*time_norm
+     real(dp) :: I1_data = 8.012e37_dp/(mass_norm*length_norm**2)
+     real(dp) :: I2_data = 8.012e37_dp/(mass_norm*length_norm**2)
+     real(dp) :: I3_data = 8.038e37_dp/(mass_norm*length_norm**2)
+   contains
+     procedure ::  a => get_a
+     procedure ::  b => get_b
+     procedure ::  c => get_c
+     procedure ::  g => get_g
+     procedure :: Om => get_Om
+     procedure :: I1 => get_I1
+     procedure :: I2 => get_I2
+     procedure :: I3 => get_I3
+  end type model_parameters
+  
+  
+
 contains
 
-
-  real(dp)  function surface_gravity_spherical_model(self) result(g)
-    use module_quadrature
+  real(dp)  function mass_spherical_model(self,n) result(M)
     class(spherical_model), intent(in) :: self
-    integer(i4b), parameter :: n = 5
-    integer(i4b) :: isection,ilayer,i
+    integer(i4b), intent(in), optional :: n
+    integer(i4b), parameter :: ndef = 5
+    integer(i4b) :: isection,ilayer,i,nuse
     real(dp) :: r1,r2,r,w
     type(gauss_quadrature) :: quad
-    call quad%set(n)   
-    g = 0.0_dp
+    if(present(n)) then
+       nuse = n
+    else
+       nuse = ndef
+    end if
+    call quad%set(nuse)   
+    M = 0.0_dp
     do isection = 1,self%nsections
        do ilayer = 1,self%section(isection)%nlayers
           associate(layer => self%section(isection)%layer(ilayer))
             r1 = layer%r1
             r2 = layer%r2
             call quad%trans(r1,r2)
-            do i = 1,n
+            do i = 1,nuse
                r = quad%x(i)
                w = quad%w(i)
-               g = g + layer%rho(r)*r*r*w
+               M = M + 4.0_dp*pi*layer%rho(r)*r*r*w
             end do
           end associate
        end do
     end do
-    g = 4.0_dp*pi*g*bigg/(self%r2**2)
+    return
+  end function mass_spherical_model
+
+  real(dp)  function surface_gravity_spherical_model(self,n) result(g)
+    class(spherical_model), intent(in) :: self
+    integer(i4b), intent(in), optional :: n
+    g = self%M(n)*bigg/self%r2**2
     return
   end function surface_gravity_spherical_model
+
+
 
   
   !--------------------------------------------!
@@ -691,5 +732,83 @@ contains
     qmu = qmu/(15.0_dp*self%mu(r))
     return
   end function qmu_spherical_solid_anelastic_layer
+
+
+  !======================================================!
+  !       routines for the earth_parameters type         !
+  !======================================================!
+
+  real(dp) function get_a(self) result(a)
+    class(model_parameters), intent(in) :: self
+    a = self%a_data
+    return
+  end function get_a
+  
+  real(dp) function get_b(self) result(b)
+    class(model_parameters), intent(in) :: self
+    b = self%b_data
+    return
+  end function get_b
+
+
+  real(dp) function get_c(self) result(c)
+    class(model_parameters), intent(in) :: self
+    c = self%c_data
+    return
+  end function get_c
+  
+  real(dp) function get_g(self) result(g)
+    class(model_parameters), intent(in) :: self
+    g = self%g_data
+    return
+  end function get_g
+  
+  real(dp) function get_Om(self) result(Om)
+    class(model_parameters), intent(in) :: self
+    Om = self%Om_data
+    return
+  end function get_Om
+
+  real(dp) function get_I1(self) result(I1)
+    class(model_parameters), intent(in) :: self
+    I1 = self%I1_data
+    return
+  end function get_I1
+
+  real(dp) function get_I2(self) result(I2)
+    class(model_parameters), intent(in) :: self
+    I2 = self%I2_data
+    return
+  end function get_I2
+
+  real(dp) function get_I3(self) result(I3)
+    class(model_parameters), intent(in) :: self
+    I3 = self%I3_data
+    return
+  end function get_I3
+  
+  real(dp) function get_M(self) result(M)
+    class(model_parameters), intent(in) :: self
+    M = self%M_data
+    return
+  end function get_M
+
+  subroutine set_model_parameters(self,a,b,c,M,g,Om,I1,I2,I3)
+    class(model_parameters), intent(inout) :: self
+    real(dp), intent(in), optional :: a,b,c,g,Om,I1,I2,I3,M
+    if(present(a)) self%a_data = a
+    if(present(b)) self%b_data = b
+    if(present(c)) self%c_data = c
+    if(present(g)) self%M_data = M
+    if(present(g)) self%g_data = g    
+    if(present(Om)) self%Om_data = Om
+    if(present(I1)) self%I1_data = I1
+    if(present(I2)) self%I2_data = I2
+    if(present(I3)) self%I3_data = I3    
+    return
+  end subroutine set_model_parameters
+  
+
+  
   
 end module module_spherical_model

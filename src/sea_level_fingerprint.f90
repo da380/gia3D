@@ -1,5 +1,5 @@
 program sea_level_fingerprint
-
+  
   use module_constants
   use module_physical_constants
   use module_util
@@ -9,10 +9,10 @@ program sea_level_fingerprint
   use module_linear_solver
   use module_sea_level
   implicit none
-
+  
   logical :: found
   integer(i4b) :: lmax,ith,iph,io,l,m,it
-  real(dp) :: th,ph,f,th1,th2,g,int,area,fac,eps
+  real(dp) :: th,ph,f,th1,th2,g,int,area,fac,eps,start,finish
   complex(dpc) :: ctmp
 
   type(spherical_model), allocatable :: model
@@ -20,19 +20,19 @@ program sea_level_fingerprint
   type(love_number), dimension(:), allocatable :: lln,tln
   type(real_scalar_gauss_legendre_field) :: ice1,sl1,ice2,sl2,sigma,sls,ofun
   type(real_scalar_spherical_harmonic_expansion) :: sigma_lm
-
   
   ! set up the GL grid
   call check_arguments(1,'-lmax [maximum degree]')
   found = found_command_argument('-lmax',lmax)
   call grid%allocate(lmax,0)
 
-
   ! compute the love numbers
   model = elastic_PREM(.false.)
-  g = model%g()  
+  
   allocate(lln(0:lmax))
   call make_love_numbers(model,0,lmax,lln = lln)
+  allocate(tln(2:2))
+  call make_love_numbers(model,2,2,tln = tln)
 
 
   ! allocate the GL fields
@@ -40,12 +40,6 @@ program sea_level_fingerprint
   call  sl1%allocate(grid)
   call ice2%allocate(grid)
   call  sl2%allocate(grid)
-  call  sls%allocate(grid)
-  call sigma%allocate(grid)
-  call ofun%allocate(grid)
-
-  ! allocate spherical harmonic expansions
-  call sigma_lm%allocate(grid)
 
   ! set values for the input fields
   do ith = 1,grid%nth
@@ -60,44 +54,17 @@ program sea_level_fingerprint
      end do
   end do
 
-  ! set the initial guess for the new sea level
-  sl2 = sl1
-
-  do it = 1,10
-
-     ! store the old sea level
-     sls%rdata = sl2%rdata
-     
-     ! compute the load
-     call load(sl1,ice1,sl2,ice2,sigma)
-     call grid%SH_trans(sigma,sigma_lm)
-     
-     ! force mass conservation
-     area = ocean_area(grid,sl2,ice2)
-     int = sigma%integrate(grid)
-     sl2%rdata = sl2%rdata - int/(rho_water*area)
-  
-     ! updae the sea level
-     call sigma_lm%filter(-lln(:)%ku - lln%kp/g)
-     call grid%SH_itrans(sigma_lm,sigma)
-     sl2%rdata =  sl1%rdata + sigma%rdata
-
-     ! estimate the error
-     eps = maxval(abs(sl2%rdata-sls%rdata))/maxval(abs(sl2%rdata))
-     
-     print *, eps
-
-  end do
-
-
-  call ocean_function(sl2,ice2,ofun)
+  call cpu_time(start)
+  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2)
+  call cpu_time(finish)
+  print *, finish-start
   
   ! write out the new sea level
   open(newunit = io,file='sl.out')
   write(io,*) grid%nth,grid%nph,0
   do ith = 1,grid%nth
      do iph = 1,grid%nph
-        write(io,*) grid%ph(iph),grid%th(ith),ofun%get(iph,ith)*(sl2%get(iph,ith)-sl1%get(iph,ith))*length_norm
+        write(io,*) grid%ph(iph),grid%th(ith),(sl1%get(iph,ith)-0*sl1%get(iph,ith))*length_norm
      end do
   end do
   
@@ -119,7 +86,7 @@ contains
     real(dp), parameter :: th4  = 160.0_dp*deg2rad
     real(dp), parameter :: sl1  = -100.0_dp/length_norm
     real(dp), parameter :: sl2  =  3000.0_dp/length_norm
-    real(dp), parameter :: sl3  = -10.0_dp/length_norm
+    real(dp), parameter :: sl3  = -5.0_dp/length_norm
 
     real(dp) :: th11,th22,th33,th44
 
@@ -150,13 +117,10 @@ contains
 
     real(dp), parameter :: th1   = 18.0_dp*deg2rad
     real(dp), parameter :: th2   = 20.0_dp*deg2rad
-    real(dp), parameter :: ice1  = 10000.0_dp/length_norm
+    real(dp), parameter :: ice1  = 1000.0_dp/length_norm
     real(dp), parameter :: ice2  =    0.0_dp/length_norm 
 
-    if(ph > pi .or. ph < 0.8*pi ) then
-       ice = 0.0_dp
-       return
-    end if
+
     if(th <= th1) then
        ice = ice1
     else if(th > th1 .and. th < th2) then

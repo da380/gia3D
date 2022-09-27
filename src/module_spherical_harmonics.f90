@@ -74,6 +74,7 @@ module module_spherical_harmonics
    contains
      procedure :: delete => delete_gauss_legendre_field
      procedure :: index =>    index_gauss_legendre_field
+     procedure :: copy => copy_gauss_legendre_field
      procedure :: scale_gauss_legendre_field
      procedure :: real_scale_gauss_legendre_field
      generic   :: scale => scale_gauss_legendre_field,     &
@@ -158,7 +159,7 @@ module module_spherical_harmonics
      !
      ! To get the indices easily, there is the proceedure self%rindex(l,m,icomp)
      !
-     logical :: allocated
+     logical :: allocated = .false.
      integer(i4b) :: lmax
      real(dp) :: s = 0.0_dp
      real(dp) :: mu = 1.0_dp
@@ -933,6 +934,48 @@ contains
     return
   end function index_gauss_legendre_field
 
+
+  subroutine copy_gauss_legendre_field(self,other)
+    class(gauss_legendre_field), intent(inout) :: self
+    class(gauss_legendre_field), intent(in) :: other
+
+    if(.not.other%allocated) then
+       call self%delete()
+       return
+    end if
+
+    if(self%allocated) then
+       if(self%lmax /= other%lmax) call self%delete()
+    end if
+
+    self%allocated = .true.
+    self%lmax      = other%lmax
+    self%nth       = other%nth
+    self%nph       = other%nph
+    self%nc        = other%nc
+    self%cdim      = other%cdim
+    if(allocated(self%nval)) then
+       self%nval = other%nval
+    else
+       allocate(self%nval,source = other%nval)
+    end if
+    if(allocated(self%cdata)) then
+       self%cdata = other%cdata
+    else
+       allocate(self%cdata,source = other%cdata)
+    end if
+    self%nr = other%nr
+    self%rdim = other%rdim
+    if(allocated(self%rdata)) then
+       self%rdata = other%rdata
+    else
+       allocate(self%rdata,source = other%rdata)
+    end if
+    
+    return
+  end subroutine copy_gauss_legendre_field
+
+  
   subroutine scale_gauss_legendre_field(self,a)
     implicit none
     class(gauss_legendre_field), intent(inout) :: self
