@@ -18,14 +18,14 @@ program sea_level_fingerprint
   type(spherical_model), allocatable :: model
   type(gauss_legendre_grid) :: grid
   type(love_number), dimension(:), allocatable :: lln,tln
-  type(real_scalar_gauss_legendre_field) :: ice1,sl1,ice2,sl2,sigma,sls,ofun
-  type(real_scalar_spherical_harmonic_expansion) :: sigma_lm
+!  type(real_scalar_gauss_legendre_field) :: ice1,sl1,ice2,sl2,sigma,sls,ofun
+!  type(real_scalar_spherical_harmonic_expansion) :: sigma_lm  
   
   ! set up the GL grid
   call check_arguments(1,'-lmax [maximum degree]')
   found = found_command_argument('-lmax',lmax)
   call grid%allocate(lmax,0)
-
+  
   ! compute the love numbers
   model = elastic_PREM(.false.)
   
@@ -35,40 +35,35 @@ program sea_level_fingerprint
   call make_love_numbers(model,2,2,tln = tln)
 
 
-  ! allocate the GL fields
-  call ice1%allocate(grid)
-  call  sl1%allocate(grid)
-  call ice2%allocate(grid)
-  call  sl2%allocate(grid)
 
   ! set values for the input fields
-  do ith = 1,grid%nth
-     th = grid%th(ith)
-     do iph = 1,grid%nph
-        ph = grid%ph(iph)
-        f = initial_sea_level(ph,th)
-        call sl1%set(iph,ith,f)
-        f = initial_ice(ph,th)
-        call ice1%set(iph,ith,f)
-        call ice2%set(iph,ith,0.0_dp)
-     end do
-  end do
+!  do ith = 1,grid%nth
+!     th = grid%th(ith)
+!     do iph = 1,grid%nph
+!        ph = grid%ph(iph)
+!        f = initial_sea_level(ph,th)
+!        call sl1%set(iph,ith,f)
+!        f = initial_ice(ph,th)
+!        call ice1%set(iph,ith,f)
+!        call ice2%set(iph,ith,0.0_dp)
+!     end do
+!  end do
 
-  call cpu_time(start)
-  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2)
-  call cpu_time(finish)
-  print *, finish-start
+!  call cpu_time(start)
+!  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2)
+!  call cpu_time(finish)
+!  print *, finish-start
   
   ! write out the new sea level
-  open(newunit = io,file='sl.out')
-  write(io,*) grid%nth,grid%nph,0
-  do ith = 1,grid%nth
-     do iph = 1,grid%nph
-        write(io,*) grid%ph(iph),grid%th(ith),(sl1%get(iph,ith)-0*sl1%get(iph,ith))*length_norm
-     end do
-  end do
-  
-  close(io)
+!  open(newunit = io,file='sl.out')
+!  write(io,*) grid%nth,grid%nph,0
+!  do ith = 1,grid%nth
+!     do iph = 1,grid%nph
+!        write(io,*) grid%ph(iph),grid%th(ith),(sl2%get(iph,ith)-0*sl1%get(iph,ith))*length_norm
+!     end do
+!  end do
+!  
+!  close(io)
   
   
 contains
@@ -79,14 +74,14 @@ contains
     real(dp), intent(in) :: th
 
     real(dp), parameter :: amp1  = 0.3_dp
-    real(dp), parameter :: amp2  = 0.1_dp
+    real(dp), parameter :: amp2  = 0.0_dp
     real(dp), parameter :: th1  = 20.0_dp*deg2rad
     real(dp), parameter :: th2  = 30.0_dp*deg2rad
-    real(dp), parameter :: th3  = 140.0_dp*deg2rad
+    real(dp), parameter :: th3  = 158.0_dp*deg2rad
     real(dp), parameter :: th4  = 160.0_dp*deg2rad
     real(dp), parameter :: sl1  = -100.0_dp/length_norm
     real(dp), parameter :: sl2  =  3000.0_dp/length_norm
-    real(dp), parameter :: sl3  = -5.0_dp/length_norm
+    real(dp), parameter :: sl3  = -1000.0_dp/length_norm
 
     real(dp) :: th11,th22,th33,th44
 
@@ -115,7 +110,7 @@ contains
     real(dp), intent(in) :: ph
     real(dp), intent(in) :: th
 
-    real(dp), parameter :: th1   = 18.0_dp*deg2rad
+    real(dp), parameter :: th1   = 15.0_dp*deg2rad
     real(dp), parameter :: th2   = 20.0_dp*deg2rad
     real(dp), parameter :: ice1  = 1000.0_dp/length_norm
     real(dp), parameter :: ice2  =    0.0_dp/length_norm 
