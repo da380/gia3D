@@ -10,5 +10,5 @@ file1 = sys.argv[1]
 
 pu.plot_2D_data(file1)
 plt.gca().invert_yaxis()
-#plt.clim([-5,5])
+
 plt.show()

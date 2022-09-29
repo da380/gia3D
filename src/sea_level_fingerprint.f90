@@ -11,59 +11,65 @@ program sea_level_fingerprint
   implicit none
   
   logical :: found
-  integer(i4b) :: lmax,ith,iph,io,l,m,it
-  real(dp) :: th,ph,f,th1,th2,g,int,area,fac,eps,start,finish
-  complex(dpc) :: ctmp
+  integer(i4b) :: lmax,ith,iph,io,l,m,it,nph,nth
+  real(dp) :: th,ph,start,finish
+
 
   type(spherical_model), allocatable :: model
   type(gauss_legendre_grid) :: grid
   type(love_number), dimension(:), allocatable :: lln,tln
-!  type(real_scalar_gauss_legendre_field) :: ice1,sl1,ice2,sl2,sigma,sls,ofun
-!  type(real_scalar_spherical_harmonic_expansion) :: sigma_lm  
+  real(dp), dimension(:,:), allocatable :: ice1,sl1,ice2,sl2, &
+                                           sigma,sls,ofun
   
   ! set up the GL grid
   call check_arguments(1,'-lmax [maximum degree]')
   found = found_command_argument('-lmax',lmax)
-  call grid%allocate(lmax,0)
+  call grid%build(lmax,0)
+  nph = grid%nph
+  nth = grid%nth
   
   ! compute the love numbers
   model = elastic_PREM(.false.)
   
-  allocate(lln(0:lmax))
-  call make_love_numbers(model,0,lmax,lln = lln)
-  allocate(tln(2:2))
-  call make_love_numbers(model,2,2,tln = tln)
+  allocate(lln(0:lmax),tln(0:lmax))
+  call make_love_numbers(model,0,lmax,lln = lln,tln = tln)
 
-
+  ! allocate the arrays
+  allocate(sl1(nph,nth), ice1(nph,nth), &
+           sl2(nph,nth), ice2(nph,nth))
 
   ! set values for the input fields
-!  do ith = 1,grid%nth
-!     th = grid%th(ith)
-!     do iph = 1,grid%nph
-!        ph = grid%ph(iph)
-!        f = initial_sea_level(ph,th)
-!        call sl1%set(iph,ith,f)
-!        f = initial_ice(ph,th)
-!        call ice1%set(iph,ith,f)
-!        call ice2%set(iph,ith,0.0_dp)
-!     end do
-!  end do
+  do ith = 1,nth
+     th = grid%th(ith)
+     do iph = 1,nph
+        ph = grid%ph(iph)
+        sl1(iph,ith)  = initial_sea_level(ph,th)
+        ice1(iph,ith) = initial_ice(ph,th)
+        if(iph > nph/2) then
+           ice2(iph,ith) = 0.0_dp
+        else
+           ice2(iph,ith) = ice1(iph,ith)
+        end if
+     end do
+  end do
 
-!  call cpu_time(start)
-!  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2)
-!  call cpu_time(finish)
-!  print *, finish-start
+  call cpu_time(start)
+  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2,verb = .true.)
+  call cpu_time(finish)
+  print *, finish-start
+
   
   ! write out the new sea level
-!  open(newunit = io,file='sl.out')
-!  write(io,*) grid%nth,grid%nph,0
-!  do ith = 1,grid%nth
-!     do iph = 1,grid%nph
-!        write(io,*) grid%ph(iph),grid%th(ith),(sl2%get(iph,ith)-0*sl1%get(iph,ith))*length_norm
-!     end do
-!  end do
-!  
-!  close(io)
+  open(newunit = io,file='sl.out')
+  write(io,*) grid%nth,grid%nph,0
+  do ith = 1,grid%nth
+     do iph = 1,grid%nph
+        write(io,*) grid%ph(iph),grid%th(ith),(sl2(iph,ith)-sl1(iph,ith))*length_norm
+
+     end do
+  end do
+  
+  close(io)
   
   
 contains

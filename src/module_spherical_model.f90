@@ -166,9 +166,9 @@ module module_spherical_model
   
   type model_parameters
      private
-     real(dp) ::  a_data = 6357.0_dp/length_norm
-     real(dp) ::  b_data = 6371.0_dp/length_norm
-     real(dp) ::  c_data = 6371.0_dp/length_norm
+     real(dp) ::  a_data = 6357000.0_dp/length_norm
+     real(dp) ::  b_data = 6371000.0_dp/length_norm
+     real(dp) ::  c_data = 6371000.0_dp/length_norm
      real(dp) ::  M_data = 5.972e24_dp/mass_norm
      real(dp) ::  g_data = 9.807_dp/acceleration_norm
      real(dp) :: Om_data = twopi/(24.0*3600.0_dp)*time_norm

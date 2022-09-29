@@ -27,26 +27,34 @@ module module_spherical_harmonics
      type(C_PTR) :: plan_c2r     
    contains
      procedure :: delete => delete_gauss_legendre_grid
-     procedure :: allocate =>  allocate_gauss_legendre_grid
+     procedure :: build =>  build_gauss_legendre_grid
      procedure :: ph =>  ph_gauss_legednre_grid
-     procedure :: SH_trans_gauss_legendre_grid
-     procedure :: scalar_SH_trans_gauss_legendre_grid
-     procedure :: real_SH_trans_gauss_legendre_grid
-     procedure :: real_scalar_SH_trans_gauss_legendre_grid
+     procedure, private :: SH_trans_gauss_legendre_grid
+     procedure, private :: scalar_SH_trans_gauss_legendre_grid
+     procedure, private :: real_SH_trans_gauss_legendre_grid
+     procedure, private :: real_scalar_SH_trans_gauss_legendre_grid
      generic :: SH_trans => SH_trans_gauss_legendre_grid,        &
                             scalar_SH_trans_gauss_legendre_grid, & 
                             real_SH_trans_gauss_legendre_grid,   &
                             real_scalar_SH_trans_gauss_legendre_grid
-     procedure :: SH_itrans_gauss_legendre_grid
-     procedure :: scalar_SH_itrans_gauss_legendre_grid
-     procedure :: real_SH_itrans_gauss_legendre_grid
-     procedure :: real_scalar_SH_itrans_gauss_legendre_grid
+     procedure, private :: SH_itrans_gauss_legendre_grid
+     procedure, private :: scalar_SH_itrans_gauss_legendre_grid
+     procedure, private :: real_SH_itrans_gauss_legendre_grid
+     procedure, private :: real_scalar_SH_itrans_gauss_legendre_grid
      generic :: SH_itrans => SH_itrans_gauss_legendre_grid,        &
                              scalar_SH_itrans_gauss_legendre_grid, & 
                              real_SH_itrans_gauss_legendre_grid,   &
                              real_scalar_SH_itrans_gauss_legendre_grid
+     procedure, private :: integrate_gauss_legendre_grid_complex
+     procedure, private :: integrate_gauss_legendre_grid_real
+     generic   :: integrate => integrate_gauss_legendre_grid_complex, &
+                               integrate_gauss_legendre_grid_real
      procedure, nopass :: cindex => index_complex_spherical_harmonic_expansion
      procedure, nopass :: rindex => index_real_spherical_harmonic_expansion
+     procedure, private :: filter_spherical_harmonic_coefficients_complex
+     procedure, private :: filter_spherical_harmonic_coefficients_real
+     generic :: filter => filter_spherical_harmonic_coefficients_complex, &
+                          filter_spherical_harmonic_coefficients_real
   end type gauss_legendre_grid
 
   
@@ -78,7 +86,7 @@ contains
   end subroutine delete_gauss_legendre_grid
 
   
-  subroutine allocate_gauss_legendre_grid(self,lmax,nmax,fftw_flag)
+  subroutine build_gauss_legendre_grid(self,lmax,nmax,fftw_flag)
     use module_special_functions
     use module_quadrature
     use module_fftw3    
@@ -164,7 +172,7 @@ contains
     
     self%allocated =.true.
     return
-  end subroutine allocate_gauss_legendre_grid
+  end subroutine build_gauss_legendre_grid
 
   
   function ph_gauss_legednre_grid(self,iph) result(ph)
@@ -349,6 +357,7 @@ contains
     call SH_trans_gauss_legendre_grid(self,0,u,ulm)
     return
   end subroutine scalar_SH_trans_gauss_legendre_grid
+
   
   subroutine SH_itrans_gauss_legendre_grid(self,n,ulm,u)
     use module_fftw3
@@ -384,9 +393,7 @@ contains
     na = abs(n)
     even = modulo(n,2) == 0
 
-
     if(even) then
-
 
        do ith = 1,nth
           in = 0.0_dp
@@ -518,6 +525,7 @@ contains
     return
   end subroutine scalar_SH_itrans_gauss_legendre_grid
 
+  
   subroutine real_SH_trans_gauss_legendre_grid(self,n,u,ulm)
     use module_fftw3
     implicit none
@@ -588,6 +596,7 @@ contains
     return
   end subroutine real_scalar_SH_trans_gauss_legendre_grid
 
+  
   subroutine real_SH_itrans_gauss_legendre_grid(self,n,ulm,u)
     use module_fftw3
     implicit none
@@ -655,11 +664,50 @@ contains
     call real_SH_itrans_gauss_legendre_grid(self,0,ulm,u)
     return
   end subroutine real_scalar_SH_itrans_gauss_legendre_grid
+
+
+  complex(dpc) function integrate_gauss_legendre_grid_complex(self,u) result(int)
+    class(gauss_legendre_grid), intent(in) :: self
+    complex(dpc), dimension(self%nph,self%nth), intent(in) :: u
+    integer(i4b) :: ith,iph,nth,nph
+    real(dp) :: fac
+    complex(dpc) :: tmp
+    nth = self%nth
+    nph = self%nph
+    fac = twopi/nph
+    area = 0.0_dp
+    do ith = 1,nth
+       tmp = sum(u(:,ith))
+       int = int + tmp*self%w(ith)*fac
+    end do    
+    return
+  end function integrate_gauss_legendre_grid_complex
+
+
+
+  real(dp) function integrate_gauss_legendre_grid_real(self,u) result(int)
+    class(gauss_legendre_grid), intent(in) :: self
+    real(dp), dimension(self%nph,self%nth), intent(in) :: u
+    integer(i4b) :: ith,iph,nth,nph
+    real(dp) :: fac
+    real(dp) :: tmp
+    nth = self%nth
+    nph = self%nph
+    fac = twopi/nph
+    area = 0.0_dp
+    do ith = 1,nth
+       tmp = sum(u(:,ith))
+       int = int + tmp*self%w(ith)*fac
+    end do    
+    return
+  end function integrate_gauss_legendre_grid_real
+
   
-  function index_complex_spherical_harmonic_expansion(l,m) result(i)
+  
+  
+  integer(i4b) function index_complex_spherical_harmonic_expansion(l,m) result(i)
     implicit none
     integer(i4b), intent(in) :: l,m
-    integer(i4b) :: i
     i = l**2
     if(m == 0) then
        i = i+1
@@ -671,18 +719,43 @@ contains
     return
   end function index_complex_spherical_harmonic_expansion
 
-
-  function index_real_spherical_harmonic_expansion(l,m) result(i)
+  integer(i4b) function index_real_spherical_harmonic_expansion(l,m) result(i)
     implicit none
     integer(i4b), intent(in) :: l,m
-    integer(i4b) :: i
     i = l*(l+1)/2 + m + 1
     return
   end function index_real_spherical_harmonic_expansion
-  
-  
 
-  
+  subroutine filter_spherical_harmonic_coefficients_complex(grid,fac,u,v)
+    class(gauss_legendre_grid), intent(in) :: grid
+    complex(dpc), dimension(0:grid%lmax) :: fac
+    complex(dpc), dimension(grid%ncoef_c), intent(in) :: u
+    complex(dpc), dimension(grid%ncoef_c), intent(out) :: v
+    integer(i4b) :: l,i1,i2
+    do l = 0,grid%lmax
+       i1 = grid%cindex(l,0)
+       i2 = grid%cindex(l,-l)
+       v(i1:i2) = fac(l)*u(i1:i2)
+    end do    
+    return
+  end subroutine filter_spherical_harmonic_coefficients_complex
+
+  subroutine filter_spherical_harmonic_coefficients_real(grid,fac,u,v)
+    class(gauss_legendre_grid), intent(in) :: grid
+    real(dp), dimension(0:grid%lmax) :: fac
+    complex(dpc), dimension(grid%ncoef_r), intent(in) :: u
+    complex(dpc), dimension(grid%ncoef_r), intent(out) :: v
+    integer(i4b) :: l,i1,i2
+    do l = 0,grid%lmax
+       i1 = grid%rindex(l,0)
+       i2 = grid%rindex(l,l)
+       v(i1:i2) = fac(l)*u(i1:i2)
+    end do    
+    return
+  end subroutine filter_spherical_harmonic_coefficients_real
+
+
+
 end module module_spherical_harmonics
 
 

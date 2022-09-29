@@ -19,7 +19,7 @@ program test_spherical_harmonics
   nmax = 2
   print *, 'building the grid for degree ',lmax
   call cpu_time(start)
-  call grid%allocate(lmax,nmax)  
+  call grid%build(lmax,nmax)  
   call cpu_time(finish)
   print *, 'assembly time = ',finish-start
 
