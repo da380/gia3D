@@ -92,7 +92,7 @@ contains
     
     ! check the size of the arrays
     n = size(xx)
-    call error(n /= size(ff),'set_linear_interp_1D', &
+    call check(n == size(ff),'set_linear_interp_1D', &
                              'dimensions of arrays do not match')
 
     
@@ -105,7 +105,7 @@ contains
           j = j-1
        end if
     end do
-    call error(j /= n-1 .and. j /= -n+1,'set_linear_interp_1D','array not consecutive')
+    call check(j == n-1 .or. j == -n+1,'set_linear_interp_1D','array not consecutive')
 
     
     ! store the dimensions
@@ -414,8 +414,8 @@ contains
     ! check the size of the arrays
     nx = size(xx)
     ny = size(yy)
-    call error(nx /= size(ff,1) .or. ny /= size(ff,2), &
-               'set_linear_interp_1D','dimensions of arrays do not match')
+    call check(nx == size(ff,1) .and. ny == size(ff,2), &
+               'set_linear_interp_2D','dimensions of arrays do not match')
 
     
     ! check the arrays are consecutive
@@ -427,7 +427,7 @@ contains
           j = j-1
        end if
     end do
-    call error(j /= nx-1 .and. j /= -nx+1,'set_linear_interp_2D','x-array not consecutive')
+    call check(j == nx-1 .or. j == -nx+1,'set_linear_interp_2D','x-array not consecutive')
 
 
     ! check the arrays are consecutive
@@ -439,7 +439,7 @@ contains
           j = j-1
        end if
     end do
-    call error(j /= ny-1 .and. j /= -ny+1,'set_linear_interp_2D','y-array not consecutive')
+    call check(j == ny-1 .or. j == -ny+1,'set_linear_interp_2D','y-array not consecutive')
 
     
     ! store the dimensions

@@ -239,7 +239,7 @@ contains
     else
        factor_local = .true.
     end if       
-    call error(l < 1,'build_toroidal_matrix','l<1')    
+    call check(l > 0,'build_toroidal_matrix','l<1')    
     mat%l = l
     mat%ibool = build_boolean_toroidal(mesh,toroidal_start(mesh,l))
     if(l == 1) mat%ibool%ndim = mat%ibool%ndim-1
@@ -268,7 +268,7 @@ contains
     
     if(factor_local) then
        call dpbtrf('U',ndim,kd,mat%a,ldab,info)
-       call error(info /= 0,'build_toroidal_matrix','problem with factorisation')
+       call check(info == 0,'build_toroidal_matrix','problem with factorisation')
        mat%factorised = .true.
     end if
     return
@@ -544,7 +544,7 @@ contains
     else
        factor_local = .true.
     end if       
-    call error(l < 1,'build_spheroidal_matrix','l<1')    
+    call check(l > 0,'build_spheroidal_matrix','l<1')    
     mat%l = l
     mat%ibool = build_boolean_spheroidal(mesh,spheroidal_start(mesh,l))
     if(l == 1) mat%ibool%ndim = mat%ibool%ndim-1
@@ -582,7 +582,7 @@ contains
     
     if(factor_local) then
        call dpbtrf('U',ndim,kd,mat%a,ldab,info)
-       call error(info /= 0,'build_spheroidal_matrix','problem with factorisation')
+       call check(info == 0,'build_spheroidal_matrix','problem with factorisation')
        mat%factorised = .true.
     end if
     

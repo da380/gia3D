@@ -166,15 +166,15 @@ module module_spherical_model
   
   type model_parameters
      private
-     real(dp) ::  a_data = 6357000.0_dp/length_norm
-     real(dp) ::  b_data = 6371000.0_dp/length_norm
-     real(dp) ::  c_data = 6371000.0_dp/length_norm
-     real(dp) ::  M_data = 5.972e24_dp/mass_norm
-     real(dp) ::  g_data = 9.807_dp/acceleration_norm
-     real(dp) :: Om_data = twopi/(24.0*3600.0_dp)*time_norm
-     real(dp) :: I1_data = 8.012e37_dp/(mass_norm*length_norm**2)
-     real(dp) :: I2_data = 8.012e37_dp/(mass_norm*length_norm**2)
-     real(dp) :: I3_data = 8.038e37_dp/(mass_norm*length_norm**2)
+     real(dp) ::  a_data =  a_EARTH
+     real(dp) ::  b_data =  b_EARTH
+     real(dp) ::  c_data =  c_EARTH
+     real(dp) ::  M_data =  M_EARTH
+     real(dp) ::  g_data =  g_EARTH
+     real(dp) :: Om_data = Om_EARTH
+     real(dp) :: I1_data = I1_EARTH
+     real(dp) :: I2_data = I2_EARTH
+     real(dp) :: I3_data = I3_EARTH
    contains
      procedure ::  a => get_a
      procedure ::  b => get_b

@@ -3,16 +3,16 @@ module module_error
 
 contains
 
-  subroutine error(check,routine,string)
+  subroutine check(test,routine,string)
     implicit none
-    logical :: check
+    logical :: test
     character(len=*) :: routine,string
-    if(check) then
+    if(.not.test) then
        print *, 'Error in routine "',trim(routine),'": ', trim(string)       
        stop
     end if
     return
-  end subroutine error
+  end subroutine check
 
 
 end module module_error

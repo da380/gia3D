@@ -36,7 +36,7 @@ program sea_level_fingerprint
 
   ! allocate the arrays
   allocate(sl1(nph,nth), ice1(nph,nth), &
-           sl2(nph,nth), ice2(nph,nth))
+           sl2(nph,nth), ice2(nph,nth),ofun(nph,nth))
 
   ! set values for the input fields
   do ith = 1,nth
@@ -45,26 +45,22 @@ program sea_level_fingerprint
         ph = grid%ph(iph)
         sl1(iph,ith)  = initial_sea_level(ph,th)
         ice1(iph,ith) = initial_ice(ph,th)
-        if(iph > nph/2) then
-           ice2(iph,ith) = 0.0_dp
-        else
-           ice2(iph,ith) = ice1(iph,ith)
-        end if
+        ice2(iph,ith) = 0.0_dp
      end do
   end do
 
   call cpu_time(start)
-  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2,verb = .true.)
+  call sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2,verb = .true.,rotation=.true.)
   call cpu_time(finish)
   print *, finish-start
-
+  sl2 = sl2-sl1
   
   ! write out the new sea level
   open(newunit = io,file='sl.out')
   write(io,*) grid%nth,grid%nph,0
   do ith = 1,grid%nth
      do iph = 1,grid%nph
-        write(io,*) grid%ph(iph),grid%th(ith),(sl2(iph,ith)-sl1(iph,ith))*length_norm
+        write(io,*) grid%ph(iph),grid%th(ith),sl2(iph,ith)*length_norm
 
      end do
   end do
@@ -79,58 +75,75 @@ contains
     real(dp), intent(in) :: ph
     real(dp), intent(in) :: th
 
-    real(dp), parameter :: amp1  = 0.3_dp
-    real(dp), parameter :: amp2  = 0.0_dp
-    real(dp), parameter :: th1  = 20.0_dp*deg2rad
-    real(dp), parameter :: th2  = 30.0_dp*deg2rad
-    real(dp), parameter :: th3  = 158.0_dp*deg2rad
-    real(dp), parameter :: th4  = 160.0_dp*deg2rad
-    real(dp), parameter :: sl1  = -100.0_dp/length_norm
-    real(dp), parameter :: sl2  =  3000.0_dp/length_norm
-    real(dp), parameter :: sl3  = -1000.0_dp/length_norm
+    real(dp), parameter :: th1 = pio4
+    real(dp), parameter :: ph1 = pio2
+    real(dp), parameter :: w11 = 0.15_dp*pi
+    real(dp), parameter :: w12 = 0.25_dp*pi
+    real(dp), parameter :: t1 = 1000.0_dp
 
-    real(dp) :: th11,th22,th33,th44
+    real(dp), parameter :: th2 = pio2
+    real(dp), parameter :: ph2 = 3.0_dp*pi/2.0_dp
+    real(dp), parameter :: w21 = 0.2_dp*pi
+    real(dp), parameter :: w22 = 0.3_dp*pi
+    real(dp), parameter :: t2 = 500.0_dp
 
-    th11 = th1*(1.0_dp+amp1*sin(4.0_dp*ph))
-    th22 = th2*(1.0_dp+amp1*sin(4.0_dp*ph))
-    th33 = th3*(1.0_dp+amp2*cos(5.0_dp*ph))
-    th44 = th4*(1.0_dp+amp2*cos(5.0_dp*ph))
+    real(dp), parameter :: sl0 = 3000.0_dp
     
-    if(th <= th11) then
-       sl = sl1
-    else if(th > th11 .and. th < th22) then
-       sl = sl1 + (th-th11)*(sl2-sl1)/(th22-th11)
-    else if(th >= th22 .and. th < th33) then
-       sl = sl2
-    else if(th >= th33 .and. th < th44) then
-       sl = sl2 + (th-th33)*(sl3-sl2)/(th44-th33)
+    real(dp) :: del1,del2
+    
+    del1 = acos(cos(th)*cos(th1) + sin(th)*sin(th1)*cos(ph-ph1))
+    del2 = acos(cos(th)*cos(th2) + sin(th)*sin(th2)*cos(ph-ph2))
+
+    if(del1 <= w11) then
+       sl = -t1
+    else if(del1 > w11 .and. del1 <= w12) then
+       sl = sl0 - (t1+sl0)*((w12-del1)/(w12-w11))**2
+    else if(del2 <= w21) then
+       sl = -t2
+    else if(del2 > w21 .and. del2 <= w22) then
+       sl = sl0 - (t2+sl0)*((w22-del2)/(w22-w21))**2
     else
-       sl = sl3
+       sl = sl0
     end if
+       
+    sl = sl/length_norm
+
     
     return
   end function initial_sea_level
 
-  
+
+
   real(dp) function initial_ice(ph,th) result(ice)
     real(dp), intent(in) :: ph
     real(dp), intent(in) :: th
 
-    real(dp), parameter :: th1   = 15.0_dp*deg2rad
-    real(dp), parameter :: th2   = 20.0_dp*deg2rad
-    real(dp), parameter :: ice1  = 1000.0_dp/length_norm
-    real(dp), parameter :: ice2  =    0.0_dp/length_norm 
+    real(dp), parameter :: th1 = pio4
+    real(dp), parameter :: ph1 = pio2
+    real(dp), parameter :: w11 = 0.2_dp*pi
+    real(dp), parameter :: w12 = 0.3_dp*pi
+    real(dp), parameter :: ice1 = 1000.0_dp
+    
+    real(dp) :: del1
+    
+    del1 = acos(cos(th)*cos(th1) + sin(th)*sin(th1)*cos(ph-ph1))
 
 
-    if(th <= th1) then
+    if(del1 <= w11) then
        ice = ice1
-    else if(th > th1 .and. th < th2) then
-       ice = ice1 + (ice2-ice1)*(th-th1)/(th2-th1)
+    else if(del1 > w11 .and. del1 <= w12) then
+       ice =  ice1*((w12-del1)/(w12-w11))**2
     else
-       ice = ice2
+       ice = 0.0_dp
     end if
+       
+    ice = ice/length_norm
+
     
     return
   end function initial_ice
+
+
+  
   
 end program sea_level_fingerprint

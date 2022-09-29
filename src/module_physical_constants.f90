@@ -27,5 +27,17 @@ module module_physical_constants
   real(dp), parameter :: rho_ice = 917.0_dp/density_norm
   real(dp), parameter :: rho_water = 1000.0_dp/density_norm
 
+
+  ! some constants for the Earth
+  real(dp), parameter ::  a_EARTH = 6357000.0_dp/length_norm
+  real(dp), parameter ::  b_EARTH = 6371000.0_dp/length_norm
+  real(dp), parameter ::  c_EARTH = 6371000.0_dp/length_norm
+  real(dp), parameter ::  M_EARTH = 5.972e24_dp/mass_norm
+  real(dp), parameter ::  g_EARTH = 9.807_dp/acceleration_norm
+  real(dp), parameter :: Om_EARTH = 7.292115e-05_dp*time_norm
+  real(dp), parameter :: I1_EARTH = 8.012e37_dp/(mass_norm*length_norm**2)
+  real(dp), parameter :: I2_EARTH = 8.012e37_dp/(mass_norm*length_norm**2)
+  real(dp), parameter :: I3_EARTH = 8.038e37_dp/(mass_norm*length_norm**2)
+  
   
 end module module_physical_constants

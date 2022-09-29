@@ -59,7 +59,7 @@ program test_matrix
   end if
 
   call dpbtrs('U',ndim,kd,1,tormat%a,ldab,b,ndim,info)
-  call error(info /= 0,'test_matrix','problem with toroidal substitution')  
+  call check(info == 0,'test_matrix','problem with toroidal substitution')  
   
   isection1 = tormat%ibool%isection1
   nsections = mesh%nsections
@@ -123,7 +123,7 @@ program test_matrix
 
   
   call dpbtrs('U',ndim,kd,1,sphmat%a,ldab,b,ndim,info)
-  call error(info /= 0,'test_matrix','problem with spheroidal substitution')  
+  call check(info == 0,'test_matrix','problem with spheroidal substitution')  
 
 
   

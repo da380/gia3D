@@ -20,6 +20,7 @@ module module_mesh
      real(dp), dimension(:,:), allocatable :: hp
      real(dp), dimension(:,:), allocatable :: rho
      real(dp), dimension(:,:), allocatable :: g
+     real(dp), dimension(:,:), allocatable :: ep
   end type spherical_layer_mesh
   
 
@@ -127,10 +128,11 @@ contains
   !                routines for mesh building                 !
   !===========================================================!
   
-  function make_spherical_mesh(ngll,model,drmax) result(mesh)
+  function make_spherical_mesh(ngll,model,drmax,Om) result(mesh)
     integer(i4b), intent(in) :: ngll
     type(spherical_model), intent(in) :: model
     real(dp), intent(in) :: drmax
+    real(dp), intent(in), optional :: Om
     type(spherical_model_mesh) :: mesh
 
     logical :: fluid
@@ -224,7 +226,7 @@ contains
        
     end do
 
-    call calculate_gravity(mesh)
+    call calculate_gravity_and_ellipticity(mesh,Om)
     
     ! flag the top and bottom layers
     mesh%section(1)%layer(1)%bottom = .true.
@@ -364,6 +366,11 @@ contains
     allocate(mesh%jac(mesh%nspec))
     allocate(mesh%rho(ngll,mesh%nspec))
     allocate(mesh%g(ngll,mesh%nspec))
+    allocate(mesh%ep(ngll,mesh%nspec))
+
+    ! initialise values for g and ep
+    mesh%g = 0.0_dp
+    mesh%ep = 0.0_dp
     
     dr = (r2-r1)/nspec
     r11 = r1
@@ -597,18 +604,26 @@ contains
 
 
   !================================================================================!
-  !                            routine to calculate gravity                        !
+  !                     routine to calculate gravity and ellipticity               !
   !================================================================================!
 
 
-  subroutine calculate_gravity(mesh)
+  subroutine calculate_gravity_and_ellipticity(mesh,Om)
     class(spherical_model_mesh), intent(inout) :: mesh
+    real(dp), optional :: Om
 
     integer(i4b) :: ndim,kd,ldab,isection,ilayer,inode, &
-                    ispec,jnode,knode,ngll,nspec,i,j,k,info
-    type(boolean_array) :: ibool
+                    ispec,jnode,knode,ngll,nspec,i,j,k,info,l
+    real(dp) :: tmp,rtmp,gtmp,rotfac
+    real(dp), dimension(:), allocatable :: drho
     real(dp), dimension(:,:), allocatable :: a,b
+    type(boolean_array) :: ibool
 
+
+
+    !=======================================================!
+    !                   gravity calculation                 !
+    !=======================================================!
     
     ! make the Boolean array
     ibool =  build_boolean_simple(mesh)
@@ -664,11 +679,11 @@ contains
     
     ! compute the factorisation
     call dpbtrf('U',ndim,kd,a,ldab,info)
-    call error(info /= 0,'calculate_gravity','problem with factorisation')
+    call check(info == 0,'calculate_gravity_and_ellipticity','problem with factorisation')
 
     ! solve the linear system
     call dpbtrs	('U',ndim,kd,1,a,ldab,b,ndim,info)
-    call error(info /= 0,'calculate_gravity','problem with substitution')
+    call check(info == 0,'calculate_gravity_and_ellipticity','problem with substitution')
 
     ! convert from potential to gravity
     do isection = 1,mesh%nsections
@@ -693,9 +708,147 @@ contains
           end associate
        end do
     end do
+    
 
+    !=======================================================!
+    !                   ellipticity calculation             !
+    !=======================================================!
+
+    if(.not.present(Om)) return
+    rotfac = sqrt(fourpi/5.0_dp)*Om*Om/3.0_dp
+
+    
+    ! build up the system matrix and RHS
+    l = 2
+    a = 0.0_dp
+    b = 0.0_dp
+    do isection = 1,mesh%nsections       
+       do ilayer = 1,mesh%section(isection)%nlayers
+          associate(layer => mesh%section(isection)%layer(ilayer),       &
+                    ngll  => mesh%section(isection)%layer(ilayer)%ngll,  &
+                    nspec => mesh%section(isection)%layer(ilayer)%nspec, &
+                    w     => mesh%section(isection)%layer(ilayer)%w,     &
+                    hp    => mesh%section(isection)%layer(ilayer)%hp,    &
+                    jac   => mesh%section(isection)%layer(ilayer)%jac,   &
+                    r     => mesh%section(isection)%layer(ilayer)%r,     &
+                    g     => mesh%section(isection)%layer(ilayer)%g,     &
+                    ep    => mesh%section(isection)%layer(ilayer)%ep,    &
+                    ibool => ibool%section(isection)%layer(ilayer),      &
+                    rho => mesh%section(isection)%layer(ilayer)%rho)
+            do ispec = 1,nspec
+               if(allocated(drho)) then
+                  if(ngll /= size(drho)) then
+                     deallocate(drho)
+                     allocate(drho(ngll))
+                  end if
+               else
+                  allocate(drho(ngll))
+               end if
+               select type(layer)
+               class is(spherical_solid_elastic_layer_mesh)                  
+                  do inode = 1,ngll
+                     drho(inode) = 0.0_dp
+                     do jnode = 1,ngll
+                        drho(inode) = drho(inode) + rho(jnode,ispec)*hp(inode,jnode)/jac(ispec)
+                     end do
+                  end do
+               class is(spherical_fluid_elastic_layer_mesh)
+                  drho(:) = layer%drho(:,ispec)                  
+               end select
+               do inode = 1,ngll
+                  i = ibool%get(1,inode,ispec)
+                  j = i
+                  k = kd+1 + i-j
+                  tmp = fourpi*bigg*drho(inode)*r(inode,ispec)**2
+                  if(tmp /= 0.0_dp) tmp = tmp/g(inode,ispec)
+                  tmp = tmp + l*(l+1)
+                  a(k,j) = a(k,j) + tmp*w(inode)*jac(ispec) 
+                  do jnode = inode,ngll
+                     j = ibool%get(1,jnode,ispec)
+                     k = kd+1+i-j
+                     do knode = 1,ngll
+                        a(k,j) = a(k,j) + hp(knode,inode)*hp(knode,jnode) &
+                                        * r(knode,ispec)**2*w(knode)/jac(ispec)                      
+                     end do
+                  end do
+                  tmp = rotfac*r(inode,ispec)**2
+                  tmp = -fourpi*bigg*drho(inode)*tmp
+                  if(tmp /= 0.0_dp) tmp = tmp/g(inode,ispec)
+                  b(i,1) = b(i,1) + tmp*r(inode,ispec)**2 &
+                                  * w(inode)*jac(ispec)
+               end do
+            end do
+          end associate
+       end do
+
+       if(isection < mesh%nsections) then
+          nspec = mesh%section(isection+1)%layer(1)%nspec
+          ngll  = mesh%section(isection+1)%layer(1)%ngll
+          tmp   = mesh%section(isection+1)%layer(1)%rho(1,1)
+       else
+          tmp = 0.0_dp
+       end if
+       ilayer = mesh%section(isection)%nlayers
+       nspec  = mesh%section(isection)%layer(ilayer)%nspec
+       ngll  = mesh%section(isection)%layer(ilayer)%ngll
+       tmp = tmp - mesh%section(isection)%layer(ilayer)%rho(ngll,nspec)
+       rtmp = mesh%section(isection)%layer(ilayer)%r(ngll,nspec)
+       gtmp = mesh%section(isection)%layer(ilayer)%g(ngll,nspec)
+       tmp = (fourpi*bigg*tmp*rtmp**2)/gtmp
+       i = ibool%section(isection)%layer(ilayer)%get(1,ngll,nspec)
+       j = i
+       k = kd+1+i-j
+       a(k,j) = a(k,j) + tmp
+       tmp = tmp*rotfac*rtmp*rtmp
+       b(i,1) = b(i,1) - tmp
+       
+    end do
+
+    
+    ! add in DTN term at the surface
+    k = kd+1
+    a(k,ndim) = a(k,ndim) + (l+1)*mesh%r2
+
+    ! compute the factorisation
+    call dpbtrf('U',ndim,kd,a,ldab,info)
+    call check(info == 0,'calculate_gravity_and_ellipticity','problem with factorisation')
+
+    ! solve the linear system
+    call dpbtrs	('U',ndim,kd,1,a,ldab,b,ndim,info)
+    call check(info == 0,'calculate_gravity_and_ellipticity','problem with substitution')
+
+    ! extract the ellipticity
+    do isection = 1,mesh%nsections
+       do ilayer = 1,mesh%section(isection)%nlayers
+          associate(ngll  => mesh%section(isection)%layer(ilayer)%ngll,  &
+                    nspec => mesh%section(isection)%layer(ilayer)%nspec, &
+                    hp    => mesh%section(isection)%layer(ilayer)%hp,    &
+                    jac   => mesh%section(isection)%layer(ilayer)%jac,   &
+                    r     => mesh%section(isection)%layer(ilayer)%r,     &
+                    rho   => mesh%section(isection)%layer(ilayer)%rho,   &
+                    g     => mesh%section(isection)%layer(ilayer)%g,     &
+                    ep     => mesh%section(isection)%layer(ilayer)%ep,   &
+                    ibool => ibool%section(isection)%layer(ilayer))
+            do ispec = 1,nspec
+               do inode = 1,ngll
+                  i = ibool%get(1,inode,ispec)
+                  tmp = rotfac*r(inode,ispec)**2
+                  tmp = tmp + b(i,1)
+                  if(r(inode,ispec) /= 0.0_dp) then
+                     ep(inode,ispec) = tmp/(r(inode,ispec)*g(inode,ispec))
+                  else
+                     ep(inode,ispec) = 0.0_dp
+                  end if
+               end do
+            end do
+          end associate
+       end do
+    end do
+
+    
     return
-  end subroutine calculate_gravity
+  end subroutine calculate_gravity_and_ellipticity
+
 
 
   

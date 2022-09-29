@@ -88,7 +88,7 @@ contains
     implicit none
     class(quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    call error(n < 1,'allocate_quadrature','quadrature order less than 1')
+    call check(n > 0,'allocate_quadrature','quadrature order less than 1')
     call self%delete()
     self%n = n
     allocate(self%x(n))
@@ -179,7 +179,7 @@ contains
     real(dp), intent(in) :: a,b
     integer(i4b) :: i
     real(dp) :: dx
-    call error(n < 2,'set_trapezoid_quadrature','order must be at least 2')
+    call check(n > 1,'set_trapezoid_quadrature','order must be at least 2')
     call self%allocate(n)
     self%a = a
     self%b = b
@@ -252,7 +252,7 @@ contains
     class(gauss_radau_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
     logical, intent(in), optional :: right
-    call error(n < 2,'set_gauss_radau_quadrature','order must be at least 2')
+    call check(n > 1,'set_gauss_radau_quadrature','order must be at least 2')
     call self%allocate(n)
     self%a = -1.0_dp
     self%b =  1.0_dp    
@@ -347,7 +347,7 @@ contains
     implicit none    
     class(gauss_lobatto_quadrature), intent(inout) :: self
     integer(i4b), intent(in) :: n
-    call error(n < 2,'set_gauss_lobatto_quadrature','order must be at least 2')
+    call check(n > 1,'set_gauss_lobatto_quadrature','order must be at least 2')
     call self%allocate(n)
     self%a = -1.0_dp
     self%b =  1.0_dp  

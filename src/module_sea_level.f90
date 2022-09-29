@@ -15,7 +15,7 @@ contains
   !=================================================================!
 
 
-  subroutine sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2,model_parms,fix_shorelines,rotation,verb)
+  subroutine sl_fingerprint(grid,lln,tln,ice1,ice2,sl1,sl2,model_parms,shorelines,rotation,verb)
     type(gauss_legendre_grid), intent(in) :: grid
     type(love_number), dimension(0:grid%lmax), intent(in) :: lln,tln
     real(dp), dimension(grid%nph,grid%nth), intent(in)  :: ice1
@@ -23,13 +23,13 @@ contains
     real(dp), dimension(grid%nph,grid%nth), intent(in)  ::  sl1
     real(dp), dimension(grid%nph,grid%nth), intent(out) ::  sl2
     type(model_parameters), intent(in), optional :: model_parms
-    logical, intent(in), optional :: fix_shorelines,rotation
+    logical, intent(in), optional :: shorelines,rotation
     logical, intent(in), optional :: verb
 
     integer(i4b), parameter :: maxit = 50
     real(dp), parameter :: eps_tol = 1.e-6_dp
 
-    logical :: fixed,write_error,rot
+    logical :: shorelines_move,write_error,rot
     integer(i4b) :: it,ilm
     real(dp) :: area,int,eps,g
     type(model_parameters) :: mp
@@ -41,10 +41,10 @@ contains
     ! deal with optional arguments
     if(present(model_parms)) mp = model_parms
 
-    if(present(fix_shorelines)) then
-       fixed = fix_shorelines
+    if(present(shorelines)) then
+       shorelines_move = shorelines
     else
-       fixed = .false.
+       shorelines_move = .true.
     end if
 
     if(present(verb)) then
@@ -64,7 +64,7 @@ contains
     
     
     ! precompute ocean function if needed
-    if(fixed) then
+    if(.not.shorelines_move) then
        allocate(ofun(grid%nph,grid%nth))
        call ocean_function(sl1,ice1,ofun)
        area = grid%integrate(ofun)       
@@ -86,19 +86,21 @@ contains
 
 
        ! compute the water_and_ice_load
-       if(fixed) then
-          call water_and_ice_load(sl1,ice1,sl2,ice2,sigma,ofun)
-       else
+       if(shorelines_move) then
           call water_and_ice_load(sl1,ice1,sl2,ice2,sigma)
+       else
+          call water_and_ice_load(sl1,ice1,sl2,ice2,sigma,ofun)
        end if
 
        ! transform the load
-       call grid%SH_trans(sigma,sigma_lm)       
+       call grid%SH_trans(sigma,sigma_lm)
 
        ! impose mass conservation
-       if(.not.fixed) area = ocean_area(grid,sl2,ice2)
+       if(shorelines_move) area = ocean_area(grid,sl2,ice2)
        int = grid%integrate(sigma)
        sl2 = sl2 - int/(rho_water*area)
+       ilm = grid%rindex(0,0)
+       sigma_lm(ilm) = 0.0_dp
 
        ! estimate the error
        eps = maxval(abs(sl2-sls))/maxval(abs(sl2))
@@ -123,14 +125,10 @@ contains
           ilm = grid%rindex(2,1)
           u_lm(ilm)   = u_lm(ilm)   + tln(2)%ku*psi_21
           phi_lm(ilm) = phi_lm(ilm) + tln(2)%kp*psi_21
-
-          ! compute the centrifugal potential perturbation
           call centrifugal_potential_perturbation(mp,phi_lm,psi_20,psi_21)
        end if
-
-
        
-       ! update sea level spatially
+       ! update sea level
        sigma_lm = -(u_lm + phi_lm/g)
        if(rot) then
           ilm = grid%rindex(2,0)
@@ -138,22 +136,21 @@ contains
           ilm = grid%rindex(2,1)
           sigma_lm(ilm) = sigma_lm(ilm) - psi_21/g
        end if
-
        call grid%SH_itrans(sigma_lm,sigma)
        sl2 = sl1 + sigma
      
-       if(it == maxit) stop 'fingerprint: no convergence'
+       if(it == maxit) print *, 'fingerprint: no convergence'
        
     end do
 
-    if(fixed) deallocate(ofun)
     
     return
   end subroutine sl_fingerprint
 
 
-
-
+  !=================================================!
+  !            sea level utility routines           !
+  !=================================================!
   
 
   subroutine ocean_function(sl,ice,ofun)
@@ -208,6 +205,7 @@ contains
     return
   end function ocean_area
   
+
   subroutine water_and_ice_load(sl1,ice1,sl2,ice2,sigma,ofun)
     real(dp), dimension(:,:), intent(in) :: sl1
     real(dp), dimension(:,:), intent(in) :: ice1

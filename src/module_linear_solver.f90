@@ -55,7 +55,7 @@ contains
                     ibool => sphmat%ibool%section(isection)%layer(ilayer))            
             call force_for_unit_harmonic_load(layer,ibool,l,b)
             call dpbtrs('U',ndim,kd,1,sphmat%a,ldab,b,ndim,info)
-            call error(info /= 0,'test_matrix','problem with spheroidal substitution')  
+            call check(info == 0,'test_matrix','problem with spheroidal substitution')  
             inode = layer%ngll
             ispec = layer%nspec
             i = ibool%get(1,inode,ispec)
@@ -85,7 +85,7 @@ contains
           associate(layer => mesh%section(isection)%layer(ilayer),         &
                     ibool => sphmat%ibool%section(isection)%layer(ilayer))            
             call dpbtrs('U',ndim,kd,1,sphmat%a,ldab,b,ndim,info)
-            call error(info /= 0,'test_matrix','problem with spheroidal substitution')  
+            call check(info == 0,'test_matrix','problem with spheroidal substitution')  
             inode = layer%ngll
             ispec = layer%nspec
             i = ibool%get(1,inode,ispec)

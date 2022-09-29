@@ -2,6 +2,7 @@ module module_spherical_harmonics
   
   use module_constants
   use module_special_functions
+  use module_error
   use module_interp
   use, intrinsic :: iso_c_binding
 
@@ -731,6 +732,7 @@ contains
     complex(dpc), dimension(0:grid%lmax) :: fac
     complex(dpc), dimension(grid%ncoef_c), intent(in) :: u
     complex(dpc), dimension(grid%ncoef_c), intent(out) :: v
+    logical :: test
     integer(i4b) :: l,i1,i2
     do l = 0,grid%lmax
        i1 = grid%cindex(l,0)
