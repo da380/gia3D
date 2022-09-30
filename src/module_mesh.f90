@@ -746,12 +746,11 @@ contains
             do ispec = 1,nspec
                do inode = 1,ngll
                   i = ibool%get(1,inode,ispec)
-                  j = i
-                  k = kd+1 + i-j
+                  k = kd+1 
                   tmp = fourpi*bigg*drho(inode,ispec)*r(inode,ispec)**2
-                  if(tmp /= 0.0_dp) tmp = tmp/g(inode,ispec)
+                  if(r(inode,ispec) /= 0.0_dp) tmp = tmp/g(inode,ispec)
                   tmp = tmp + l*(l+1)
-                  a(k,j) = a(k,j) + tmp*w(inode)*jac(ispec) 
+                  a(k,i) = a(k,i) + tmp*w(inode)*jac(ispec) 
                   do jnode = inode,ngll
                      j = ibool%get(1,jnode,ispec)
                      k = kd+1+i-j
@@ -768,6 +767,9 @@ contains
                end do
             end do
           end associate
+
+          ! need to move the discontinuity terms to be present between each layer and not each section!
+          
        end do
 
        if(isection < mesh%nsections) then
@@ -783,7 +785,7 @@ contains
          rho1  = layer%rho(ngll,nspec)
          rtmp  = layer%r(ngll,nspec)
          gtmp  = layer%g(ngll,nspec)
-         tmp = (fourpi*bigg*(rho2-rho1)*rtmp**2)/gtmp
+         tmp = fourpi*bigg*(rho2-rho1)*rtmp*rtmp/gtmp
          i = ibool%get(1,ngll,nspec)
          k = kd+1
          a(k,i) = a(k,i) + tmp
@@ -798,6 +800,7 @@ contains
     k = kd+1
     a(k,ndim) = a(k,ndim) + (l+1)*mesh%r2
 
+    
     ! compute the factorisation
     call dpbtrf('U',ndim,kd,a,ldab,info)
     call check(info == 0,'calculate_gravity_and_ellipticity','problem with factorisation')
@@ -831,9 +834,11 @@ contains
             if(isection == 1 .and. ilayer == 1) then
                ep(1,1) = ep(2,1)
             end if
+            ep = 1.5_dp*sqrt(5.0_dp/fourpi)*ep
           end associate
        end do
     end do
+
 
     
     return

@@ -21,7 +21,12 @@ module module_physical_constants
   real(dp), parameter :: load_norm = mass_norm/(length_norm**2)
   
   ! values for some useful physical constants in SI units
-  real(dp), parameter :: bigg = 6.6743e-11_dp/gravitational_constant_norm
+!  real(dp), parameter :: bigg = 6.6743e-11_dp/gravitational_constant_norm
+  real(dp), parameter :: bigg = 6.6723e-11_dp/gravitational_constant_norm
+
+
+  
+  
 
   ! density of ice and water
   real(dp), parameter :: rho_ice = 917.0_dp/density_norm

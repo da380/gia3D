@@ -17,8 +17,9 @@ program test_mesh
   type(model_parameters) :: mp
   
   model = elastic_PREM(.false.)
+!  model = anelastic_DECK('prem.200')
   l = 2
-  drmax = 0.1_dp*model%r2/(l+1)
+  drmax = 0.01_dp*model%r2/(l+1)
   ngll = 5
 
   Om = mp%Om()
@@ -33,64 +34,35 @@ program test_mesh
 
   open(newunit=io,file='mesh.out')
   count = 0  
-  do isection = ibool%isection1,mesh%nsections
+  do isection = 1,mesh%nsections
      
-     associate(ibool => ibool%section(isection), &
-          section => mesh%section(isection))
-       
-       do ilayer = ibool%ilayer1,section%nlayers
-          
-          associate(ibool => ibool%layer(ilayer), &
-               layer => section%layer(ilayer))
-            
-            ngll = layer%ngll
-            nspec = layer%nspec
-            
-            do ispec = ibool%ispec1,nspec
-               
-               do inode = 1,ngll
+       do ilayer = 1,mesh%section(isection)%nlayers
 
-                  write(io,*) layer%r(inode,ispec)*length_norm,layer%g(inode,ispec)*acceleration_norm, &
-                              layer%ep(inode,ispec)
-                  
-                  select type(layer)
-                     
-                  class is(spherical_solid_elastic_layer_mesh)
-                     
-                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec), &
-                          ibool%get(2,inode,ispec), &
-                          ibool%get(3,inode,ispec)
-                     
-                     !                   print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
-                     
-                  class is(spherical_fluid_elastic_layer_mesh)
-                     
-                     print *, isection,ilayer,ispec,inode,ibool%get(1,inode,ispec)
-                     
-                     
-                     
-                  end select
-                  
-                  
+          associate(r   => mesh%section(isection)%layer(ilayer)%r, &
+                    rho => mesh%section(isection)%layer(ilayer)%rho,    &
+                   drho => mesh%section(isection)%layer(ilayer)%drho,  &
+                      g => mesh%section(isection)%layer(ilayer)%g,     &
+                     ep => mesh%section(isection)%layer(ilayer)%ep,    &
+                  nspec => mesh%section(isection)%layer(ilayer)%nspec, &
+                  ngll  => mesh%section(isection)%layer(ilayer)%ngll)
+
+            do ispec = 1,nspec
+               do inode = 1,ngll
+            
+
+                  write(io,*) r(inode,ispec)*length_norm,                  &
+                              rho(inode,ispec)*density_norm,               &
+                              drho(inode,ispec)*density_norm/length_norm,  & 
+                              g(inode,ispec)*acceleration_norm,            &
+                              ep(inode,ispec)
                end do
-               count = count -1
-               
+
             end do
-            
-            
-            
+                        
           end associate
-          
-          print *, '--------------------------------------------------------------------'
-          
+
        end do
-       
-       
-       
-     end associate
-     
-     print *, '===================================================================='
-     
+          
   end do
   close(io)
 
