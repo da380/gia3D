@@ -18,10 +18,7 @@ program love_numbers
 
 
   
-  call check_arguments(1,'-lmax [maximum degree]', &
-                       3,'-m [model file] &
-                         &-lln [load love number file] &
-                         &-tln [tidal love number file]')
+
   
   if (.not. found_command_argument('-lmax',lmax)) stop 'lmax not set'
   allocate(ln(1:lmax))

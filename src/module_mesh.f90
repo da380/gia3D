@@ -19,6 +19,7 @@ module module_mesh
      real(dp), dimension(:), allocatable :: jac
      real(dp), dimension(:,:), allocatable :: hp
      real(dp), dimension(:,:), allocatable :: rho
+     real(dp), dimension(:,:), allocatable :: drho
      real(dp), dimension(:,:), allocatable :: g
      real(dp), dimension(:,:), allocatable :: ep
   end type spherical_layer_mesh
@@ -62,7 +63,6 @@ module module_mesh
   type, extends(spherical_layer_mesh) ::  spherical_fluid_elastic_layer_mesh
      logical :: below_solid = .false.
      logical :: above_solid = .false.
-     real(dp), dimension(:,:), allocatable :: drho
      real(dp), dimension(:,:), allocatable :: kappa
   end type spherical_fluid_elastic_layer_mesh
   
@@ -335,7 +335,7 @@ contains
     class(spherical_layer), intent(in) :: layer
     real(dp), intent(in) :: drmax
     type(spherical_layer_mesh), intent(out) :: mesh
-    integer(i4b) :: ispec,nspec,inode,jspec
+    integer(i4b) :: ispec,nspec,inode,jspec,jnode
     real(dp) :: r1,r2,r11,r22,dr,r
     real(dp), dimension(ngll) :: h
     type(gauss_lobatto_quadrature) :: quad
@@ -365,13 +365,13 @@ contains
     allocate(mesh%r(ngll,mesh%nspec))
     allocate(mesh%jac(mesh%nspec))
     allocate(mesh%rho(ngll,mesh%nspec))
+    allocate(mesh%drho(mesh%ngll,mesh%nspec))
     allocate(mesh%g(ngll,mesh%nspec))
     allocate(mesh%ep(ngll,mesh%nspec))
 
     ! initialise values for g and ep
     mesh%g = 0.0_dp
-    mesh%ep = 0.0_dp
-    
+    mesh%ep = 0.0_dp    
     dr = (r2-r1)/nspec
     r11 = r1
     do ispec = 1,nspec    
@@ -380,10 +380,21 @@ contains
           r = r11 + 0.5_dp*(quad%x(inode)+1.0_dp)*(r22-r11)
           mesh%r(inode,ispec) = r
           mesh%rho(inode,ispec) = layer%rho(r)
+          
        end do
        mesh%jac(ispec) = 0.5_dp*(r22-r11)
        r11 = r22
+       do inode = 1,ngll
+          mesh%drho(inode,ispec) = 0.0_dp
+          do jnode = 1,ngll             
+             mesh%drho(inode,ispec) = mesh%drho(inode,ispec) + mesh%rho(jnode,ispec)  &
+                                                             * mesh%hp(inode,jnode)   &
+                                                             / mesh%jac(ispec)
+          end do          
+       end do
+
     end do
+   
     
     return
   end subroutine make_spherical_layer_mesh
@@ -436,17 +447,10 @@ contains
         
     call make_spherical_layer_mesh(ngll,layer,drmax,mesh%spherical_layer_mesh)        
     allocate(mesh%kappa(mesh%ngll,mesh%nspec))
-    allocate(mesh%drho(mesh%ngll,mesh%nspec))
     do ispec = 1,mesh%nspec
        do inode = 1,mesh%ngll
           r = mesh%r(inode,ispec)
           mesh%kappa(inode,ispec) = layer%kappa(r)
-          mesh%drho(inode,ispec) = 0.0_dp
-          do jnode = 1,mesh%ngll
-             mesh%drho(inode,ispec) = mesh%drho(inode,ispec) + mesh%rho(jnode,ispec)  &
-                                                             * mesh%hp(inode,jnode)   &
-                                                             / mesh%jac(ispec)
-          end do          
        end do
     end do
     
@@ -614,8 +618,7 @@ contains
 
     integer(i4b) :: ndim,kd,ldab,isection,ilayer,inode, &
                     ispec,jnode,knode,ngll,nspec,i,j,k,info,l
-    real(dp) :: tmp,rtmp,gtmp,rotfac
-    real(dp), dimension(:), allocatable :: drho
+    real(dp) :: tmp,rtmp,gtmp,rotfac,psi,rho1,rho2
     real(dp), dimension(:,:), allocatable :: a,b
     type(boolean_array) :: ibool
 
@@ -703,8 +706,12 @@ contains
                      j = ibool%get(1,jnode,ispec)
                      g(inode,ispec) = g(inode,ispec) + b(j,1)*hp(inode,jnode)/jac(ispec)
                   end do
+                  
                end do
             end do
+            if(isection == 1 .and. ilayer == 1) then
+               g(1,1) = 0.0_dp
+            end if
           end associate
        end do
     end do
@@ -734,32 +741,14 @@ contains
                     g     => mesh%section(isection)%layer(ilayer)%g,     &
                     ep    => mesh%section(isection)%layer(ilayer)%ep,    &
                     ibool => ibool%section(isection)%layer(ilayer),      &
-                    rho => mesh%section(isection)%layer(ilayer)%rho)
+                    rho => mesh%section(isection)%layer(ilayer)%rho,     &
+                    drho => mesh%section(isection)%layer(ilayer)%drho)
             do ispec = 1,nspec
-               if(allocated(drho)) then
-                  if(ngll /= size(drho)) then
-                     deallocate(drho)
-                     allocate(drho(ngll))
-                  end if
-               else
-                  allocate(drho(ngll))
-               end if
-               select type(layer)
-               class is(spherical_solid_elastic_layer_mesh)                  
-                  do inode = 1,ngll
-                     drho(inode) = 0.0_dp
-                     do jnode = 1,ngll
-                        drho(inode) = drho(inode) + rho(jnode,ispec)*hp(inode,jnode)/jac(ispec)
-                     end do
-                  end do
-               class is(spherical_fluid_elastic_layer_mesh)
-                  drho(:) = layer%drho(:,ispec)                  
-               end select
                do inode = 1,ngll
                   i = ibool%get(1,inode,ispec)
                   j = i
                   k = kd+1 + i-j
-                  tmp = fourpi*bigg*drho(inode)*r(inode,ispec)**2
+                  tmp = fourpi*bigg*drho(inode,ispec)*r(inode,ispec)**2
                   if(tmp /= 0.0_dp) tmp = tmp/g(inode,ispec)
                   tmp = tmp + l*(l+1)
                   a(k,j) = a(k,j) + tmp*w(inode)*jac(ispec) 
@@ -771,8 +760,8 @@ contains
                                         * r(knode,ispec)**2*w(knode)/jac(ispec)                      
                      end do
                   end do
-                  tmp = rotfac*r(inode,ispec)**2
-                  tmp = -fourpi*bigg*drho(inode)*tmp
+                  psi = rotfac*r(inode,ispec)**2
+                  tmp = -fourpi*bigg*drho(inode,ispec)*psi
                   if(tmp /= 0.0_dp) tmp = tmp/g(inode,ispec)
                   b(i,1) = b(i,1) + tmp*r(inode,ispec)**2 &
                                   * w(inode)*jac(ispec)
@@ -782,25 +771,25 @@ contains
        end do
 
        if(isection < mesh%nsections) then
-          nspec = mesh%section(isection+1)%layer(1)%nspec
-          ngll  = mesh%section(isection+1)%layer(1)%ngll
-          tmp   = mesh%section(isection+1)%layer(1)%rho(1,1)
+          rho2   = mesh%section(isection+1)%layer(1)%rho(1,1)
        else
-          tmp = 0.0_dp
+          rho2 = 0.0_dp
        end if
        ilayer = mesh%section(isection)%nlayers
-       nspec  = mesh%section(isection)%layer(ilayer)%nspec
-       ngll  = mesh%section(isection)%layer(ilayer)%ngll
-       tmp = tmp - mesh%section(isection)%layer(ilayer)%rho(ngll,nspec)
-       rtmp = mesh%section(isection)%layer(ilayer)%r(ngll,nspec)
-       gtmp = mesh%section(isection)%layer(ilayer)%g(ngll,nspec)
-       tmp = (fourpi*bigg*tmp*rtmp**2)/gtmp
-       i = ibool%section(isection)%layer(ilayer)%get(1,ngll,nspec)
-       j = i
-       k = kd+1+i-j
-       a(k,j) = a(k,j) + tmp
-       tmp = tmp*rotfac*rtmp*rtmp
-       b(i,1) = b(i,1) - tmp
+       associate(layer => mesh%section(isection)%layer(ilayer), &
+                 ibool => ibool%section(isection)%layer(ilayer))
+         nspec = layer%nspec
+         ngll  = layer%ngll
+         rho1  = layer%rho(ngll,nspec)
+         rtmp  = layer%r(ngll,nspec)
+         gtmp  = layer%g(ngll,nspec)
+         tmp = (fourpi*bigg*(rho2-rho1)*rtmp**2)/gtmp
+         i = ibool%get(1,ngll,nspec)
+         k = kd+1
+         a(k,i) = a(k,i) + tmp
+         psi = rotfac*rtmp*rtmp
+         b(i,1) = b(i,1) - tmp*psi
+       end associate
        
     end do
 
@@ -836,11 +825,12 @@ contains
                   tmp = tmp + b(i,1)
                   if(r(inode,ispec) /= 0.0_dp) then
                      ep(inode,ispec) = tmp/(r(inode,ispec)*g(inode,ispec))
-                  else
-                     ep(inode,ispec) = 0.0_dp
                   end if
-               end do
+               end do               
             end do
+            if(isection == 1 .and. ilayer == 1) then
+               ep(1,1) = ep(2,1)
+            end if
           end associate
        end do
     end do

@@ -12,7 +12,9 @@ module module_util
   interface found_command_argument
      procedure :: found_command_argument_character, &
                   found_command_argument_integer,   &
-                  found_command_argument_real 
+                  found_command_argument_real,      &
+                  found_command_argument_logical,   &
+                  found_command_argument_flag 
   end interface found_command_argument
   
 contains
@@ -181,51 +183,70 @@ contains
   !             command line routines            !
   !==============================================!
 
-  subroutine check_arguments(narg,larg,nopt,lopt) 
-    integer(i4b), intent(in) :: narg    
-    character(len=*) :: larg
+  subroutine print_argument_info(nreq,ireq,dreq,nopt,iopt,dopt) 
+    integer(i4b), intent(in) :: nreq
+    character(len=*), dimension(nreq), intent(in) :: ireq
+    logical, dimension(nreq), intent(in) :: dreq
     integer(i4b), intent(in), optional :: nopt
-    character(len=*), intent(in), optional :: lopt
-    character(len=:), allocatable :: loptl
-    integer(i4b) :: n,noptl
-    logical :: okay
-    if(present(nopt) .and. present(lopt)) then
-       noptl = nopt
-       loptl = lopt
-    else
-       noptl = 0
-       loptl = ''
-    end if
-    n = command_argument_count()
-    okay = (n  >= 2*narg) .and. (n <= 2*(narg+noptl))
-    if(.not.okay) then
-       print *, 'Required: ',larg
-       if(noptl > 0) then
-          print *, 'Optional: ', lopt
+    character(len=*), dimension(:), intent(in), optional :: iopt
+    logical, dimension(:), intent(in), optional :: dopt
+
+    integer(i4b) :: i,nc
+    
+    ! work out the minimum number of command line arguments
+    nc = 0
+    do i = 1,nreq
+       if(dreq(i)) then
+          nc = nc+2
+       else
+          nc = nc+1
+       end if
+    end do
+
+    if(command_argument_count() < nc) then
+       do i = 1,nreq
+          print *, trim(ireq(i))
+       end do
+       if(present(nopt) .and. present(iopt) .and. present(dopt)) then
+          do i = 1,nopt
+             print *, trim(iopt(i))
+          end do
        end if
        stop
     end if
+  end subroutine print_argument_info
+
+  logical function found_command_argument_flag(tag) result(found)
+    character(len=*), intent(in) :: tag
+    character(len=max_string_length) :: rtag,string
+    integer(i4b) :: narg,iarg,jarg,ios
+    narg = command_argument_count()
+    found = .false.
+    do iarg = 1,narg
+       call get_command_argument(iarg,rtag)
+       if(trim(rtag) == tag) then
+          found = .true.          
+          return
+       end if
+    end do
     return
-  end subroutine check_arguments
+  end function found_command_argument_flag
+
   
   logical function found_command_argument_character(tag,val) result(found)
     character(len=*), intent(in) :: tag
     character(len=:), allocatable, intent(out) :: val
     character(len=max_string_length) :: rtag,string
-    integer(i4b) :: narg,iarg,jarg
+    integer(i4b) :: narg,iarg,ios
     narg = command_argument_count()
-    if(mod(narg,2) /= 0) then
-       stop 'found_command_argument: number of arguments needs to be divisible by two'
-    end if
     found = .false.
-    do iarg = 1,narg/2
-       jarg = 2*iarg-1
-       call get_command_argument(jarg,rtag)
-       call get_command_argument(jarg+1,string)
+    do iarg = 1,narg-1
+       call get_command_argument(iarg,rtag)
        if(trim(rtag) == tag) then
+          call get_command_argument(iarg+1,string,status = ios)
+          if(ios /= 0) return
           found = .true.
-          val = trim(string)
-          return
+          val = trim(string)         
        end if
     end do
     return
@@ -237,23 +258,16 @@ contains
     character(len=max_string_length) :: rtag,string
     integer(i4b) :: narg,iarg,jarg,ios
     narg = command_argument_count()
-    if(mod(narg,2) /= 0) then
-       stop 'found_command_argument: number of arguments needs to be divisible by two'
-    end if
     found = .false.
-    do iarg = 1,narg/2
-       jarg = 2*iarg-1
-       call get_command_argument(jarg,rtag)
-       call get_command_argument(jarg+1,string)
+    do iarg = 1,narg-1
+       call get_command_argument(iarg,rtag)
        if(trim(rtag) == tag) then
+          call get_command_argument(iarg+1,string,status = ios)
+          if(ios /= 0) return
           read(string,*,iostat = ios) val
-          if(ios == 0)  then
-             found = .true.
-             return
-          else
-             found = .false.
-             return
-          end if
+          if(ios /= 0)  return
+          found = .true.
+          return
        end if
     end do
     return
@@ -266,27 +280,44 @@ contains
     character(len=max_string_length) :: rtag,string
     integer(i4b) :: narg,iarg,jarg,ios
     narg = command_argument_count()
-    if(mod(narg,2) /= 0) then
-       stop 'found_command_argument: number of arguments needs to be divisible by two'
-    end if
     found = .false.
-    do iarg = 1,narg/2
-       jarg = 2*iarg-1
-       call get_command_argument(jarg,rtag)
-       call get_command_argument(jarg+1,string)
+    do iarg = 1,narg-1
+       call get_command_argument(iarg,rtag)
        if(trim(rtag) == tag) then
+          call get_command_argument(iarg+1,string,status = ios)
+          if(ios /= 0) return
           read(string,*,iostat = ios) val
-          if(ios == 0)  then
-             found = .true.
-             return
-          else
-             found = .false.
-             return
-          end if
+          if(ios /= 0)  return
+          found = .true.
+          return
        end if
     end do
     return
   end function found_command_argument_real
+
+
+  logical function found_command_argument_logical(tag,val) result(found)
+    character(len=*), intent(in) :: tag
+    logical, intent(out) :: val
+    character(len=max_string_length) :: rtag,string
+    integer(i4b) :: narg,iarg,jarg,ios
+    narg = command_argument_count()
+    found = .false.
+    do iarg = 1,narg-1
+       call get_command_argument(iarg,rtag)
+       if(trim(rtag) == tag) then
+          call get_command_argument(iarg+1,string,status = ios)
+          if(ios /= 0) return
+          read(string,*,iostat = ios) val
+          if(ios /= 0)  return
+          found = .true.
+          return
+       end if
+    end do
+    return
+  end function found_command_argument_logical
+  
+
 
 
   

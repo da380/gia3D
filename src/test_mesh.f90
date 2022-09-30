@@ -17,7 +17,7 @@ program test_mesh
   type(model_parameters) :: mp
   
   model = elastic_PREM(.false.)
-  l = 256
+  l = 2
   drmax = 0.1_dp*model%r2/(l+1)
   ngll = 5
 
@@ -50,7 +50,8 @@ program test_mesh
                
                do inode = 1,ngll
 
-                  write(io,*) layer%r(inode,ispec)*length_norm,layer%g(inode,ispec)*acceleration_norm,layer%ep(inode,ispec)
+                  write(io,*) layer%r(inode,ispec)*length_norm,layer%g(inode,ispec)*acceleration_norm, &
+                              layer%ep(inode,ispec)
                   
                   select type(layer)
                      

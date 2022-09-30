@@ -24,7 +24,6 @@ program test_matrix
   type(boolean_array) :: bool
   type(radial_matrices) :: mat
 
-  call check_arguments(1,'-l [int > 0]')
   if(.not. found_command_argument('-l',l) .or. l < 0) stop 'l not set'
   
   model = elastic_PREM(.false.)
@@ -36,7 +35,6 @@ program test_matrix
 
   mat = build_radial_matrices(mesh,l,spheroidals = .true. ,toroidals = .true.)
 
-  stop
   
   !============================================================!
   !                       toroidal section                     !
