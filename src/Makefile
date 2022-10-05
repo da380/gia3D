@@ -10,7 +10,7 @@ VPATH = $(BIN):$(LOBJ)
 F95 = gfortran
 
 # fftw3 f90 api location
-FFTW3 = /home/david/lib/fftw-3.3.3/api
+FFTW3 = /usr/lib/x86_64-linux-gnu/
 
 # netcdf.mod location
 NETCDF = /usr/include/
@@ -47,7 +47,7 @@ SRCS += test_special_functions.f90    \
         test.f90                      \
         test_mesh.f90                 \
         test_matrix.f90               \
-        netcdf_test.f90
+        netcdf_test.f90               
 
 
 ###########################################################

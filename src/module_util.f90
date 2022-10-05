@@ -16,6 +16,12 @@ module module_util
                   found_command_argument_logical,   &
                   found_command_argument_flag 
   end interface found_command_argument
+
+
+  interface normal_random_variable
+     procedure :: single_normal_random_variable, &
+                  vector_normal_random_variable
+  end interface normal_random_variable
   
 contains
 
@@ -319,6 +325,43 @@ contains
   
 
 
+  !==============================================!
+  !             command line routines            !
+  !==============================================!
 
+
+  subroutine single_normal_random_variable(ran)
+    real(dp), intent(out) :: ran
+    real(dp) :: u1,u2,z1,z2
+    call random_number(u1)
+    call random_number(u2)
+    ran = sqrt(-2.0_dp*log(u1))*cos(twopi*u2)    
+    return
+  end subroutine single_normal_random_variable
+
+  subroutine vector_normal_random_variable(ran)
+    real(dp), dimension(:), intent(out) :: ran
+    integer(i4b) :: n,m,i
+    real(dp) :: u1,u2,z1,z2,r
+    n = size(ran)
+    m = n/2
+    do i = 1,m
+       call random_number(u1)
+       call random_number(u2)
+       r = sqrt(-2.0_dp*log(u1))
+       z1 = r*cos(twopi*u2)
+       z2 = r*sin(twopi*u2)
+       ran(i) = z1
+       ran(m+i) = z2
+    end do
+    if(2*m < n) then
+       call random_number(u1)
+       call random_number(u2)
+       r = sqrt(-2.0_dp*log(u1))
+       ran(n) = r*cos(twopi*u2)
+    end if
+    return
+  end subroutine vector_normal_random_variable
+  
   
 end module module_util
