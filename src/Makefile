@@ -9,17 +9,25 @@ VPATH = $(BIN):$(LOBJ)
 # set the compiler 
 F95 = gfortran
 
+<<<<<<< HEAD
 # fftw3 f90 api location
 FFTW3 = /usr/lib/x86_64-linux-gnu/
+=======
+# fftw3 locations
+FFTW3_api = /usr/lib/x86_64-linux-gnu/
+FFTW3 = /usr/include/
+>>>>>>> cfa9822486090ceaf7b26f2ac784a246cc905a62
 
 # netcdf.mod location
-NETCDF = /usr/include/
+NETCDF = 
 
 # set the flags
-FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3) -I$(NETCDF)
+#FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3) -I$(NETCDF)
+FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3) -I$(FFTW3_api) 
 
 # libraries to link to
-LIBS =  -lfftw3 -lblas -llapack -lnetcdff
+#LIBS =  -lfftw3 -lblas -llapack -lnetcdff
+LIBS =  -lfftw3 -lblas -llapack 
 
 # compile the testing programs? 
 TEST=true
@@ -46,8 +54,12 @@ SRCS += test_special_functions.f90    \
         test_spherical_model.f90      \
         test.f90                      \
         test_mesh.f90                 \
+<<<<<<< HEAD
         test_matrix.f90               \
         netcdf_test.f90               
+=======
+        test_matrix.f90               
+>>>>>>> cfa9822486090ceaf7b26f2ac784a246cc905a62
 
 
 ###########################################################
