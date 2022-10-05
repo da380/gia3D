@@ -15,13 +15,14 @@ program test_spherical_harmonics
   
   
   ! make the grid  
-  lmax = 256
+  lmax = 256*2
   nmax = 2
   print *, 'building the grid for degree ',lmax
   call cpu_time(start)
   call grid%build(lmax,nmax)  
   call cpu_time(finish)
   print *, 'assembly time = ',finish-start
+
 
 
   !==================================!
