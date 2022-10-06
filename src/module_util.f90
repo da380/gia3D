@@ -20,6 +20,7 @@ module module_util
 
   interface normal_random_variable
      procedure :: single_normal_random_variable, &
+                  pair_normal_random_variable,    &
                   vector_normal_random_variable
   end interface normal_random_variable
   
@@ -328,40 +329,60 @@ contains
   !==============================================!
   !             command line routines            !
   !==============================================!
+  
 
-
-  subroutine single_normal_random_variable(ran)
-    real(dp), intent(out) :: ran
-    real(dp) :: u1,u2,z1,z2
+  subroutine pair_normal_random_variable(ran1,ran2)
+    real(dp), intent(out) :: ran1,ran2
+    real(dp) :: u1,u2,r
     call random_number(u1)
     call random_number(u2)
-    ran = sqrt(-2.0_dp*log(u1))*cos(twopi*u2)    
+    r = -2.0_dp*log(u1)
+    if(r > 0.0_dp) then
+       r = sqrt(r)
+    else
+       print *, 'hello'
+       r = 0.0_dp
+    end if
+    ran1 = r*cos(twopi*u2)
+    ran2 = r*sin(twopi*u2)    
+    return
+  end subroutine pair_normal_random_variable
+  
+  subroutine single_normal_random_variable(ran)
+    real(dp), intent(out) :: ran
+    real(dp) :: u1,u2,r
+    call random_number(u1)
+    call random_number(u2)
+    r = -2.0_dp*log(u1)
+    if(r > 0.0_dp) then
+       r = sqrt(r)
+    else
+       print *, 'hello'
+       r = 0.0_dp
+    end if
+    ran = r*cos(twopi*u2)    
     return
   end subroutine single_normal_random_variable
 
   subroutine vector_normal_random_variable(ran)
     real(dp), dimension(:), intent(out) :: ran
     integer(i4b) :: n,m,i
-    real(dp) :: u1,u2,z1,z2,r
+    real(dp) :: u1,u2,z1,z2
     n = size(ran)
     m = n/2
     do i = 1,m
-       call random_number(u1)
-       call random_number(u2)
-       r = sqrt(-2.0_dp*log(u1))
-       z1 = r*cos(twopi*u2)
-       z2 = r*sin(twopi*u2)
+       call pair_normal_random_variable(z1,z2)
        ran(i) = z1
        ran(m+i) = z2
     end do
     if(2*m < n) then
-       call random_number(u1)
-       call random_number(u2)
-       r = sqrt(-2.0_dp*log(u1))
-       ran(n) = r*cos(twopi*u2)
+       call single_normal_random_variable(z1)
+       ran(n) = z1
     end if
     return
   end subroutine vector_normal_random_variable
-  
+
+
+
   
 end module module_util

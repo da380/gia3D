@@ -14,7 +14,7 @@ module module_spherical_harmonics
   type gauss_legendre_grid
      logical :: allocated = .false.
      integer(i4b) :: lmax
-     integer(i4b) :: nmax
+     integer(i4b) :: nmax=0
      integer(i4b) :: nth
      integer(i4b) :: nph
      integer(i4b) :: ncoef_c
@@ -94,7 +94,7 @@ contains
     implicit none    
     class(gauss_legendre_grid), intent(inout) :: self
     integer(i4b), intent(in) :: lmax
-    integer(i4b), intent(in) :: nmax
+    integer(i4b), intent(in), optional :: nmax
     integer(C_INT), intent(in), optional :: fftw_flag
 
     
@@ -119,7 +119,7 @@ contains
 
     ! store the basic parameters
     self%lmax = lmax
-    self%nmax = nmax
+    if(present(nmax)) self%nmax = nmax
     nth = lmax+1
     nph = 2*lmax
     self%nth = nth
@@ -135,9 +135,9 @@ contains
     self%w = quad%weights()
 
     ! make the wigner d-functions
-    allocate(self%dlm(self%ncoef_r,-nmax:nmax,nth))
+    allocate(self%dlm(self%ncoef_r,-self%nmax:self%nmax,nth))
     do ith = 1,nth
-       call set_wigner_array(self%th(ith),lmax,nmax,self%dlm(:,:,ith),norm=.true.)
+       call set_wigner_array(self%th(ith),lmax,self%nmax,self%dlm(:,:,ith),norm=.true.)
     end do
 
     !-----------------------------!
