@@ -110,7 +110,6 @@ contains
     allocate(self%jac(self%nspec))
     allocate(self%x(self%ngll,self%nspec))
     allocate(self%ibool(self%ngll,self%nspec))
-
     
     ! get the gll points and weights  
     call quad%set(self%ngll)
@@ -133,7 +132,6 @@ contains
        xl = xr
        count = count-1
     end do
-
     
     ! allocate the matrices
     ndim = self%ibool(self%ngll,self%nspec)
@@ -163,7 +161,6 @@ contains
           end do
        end do
     end do
-
     
     ! solve the eigenvalue problem
     allocate(eval(ndim))
@@ -188,7 +185,6 @@ contains
     allocate(self%evec(ndim,self%n))
     self%eval(:) = eval(1:self%n)
     self%evec(:,:) = evec(:,1:self%n)
-
 
     ! allocate array for the mean and realised coefficients
     allocate(self%mn(self%n),self%un(self%n))

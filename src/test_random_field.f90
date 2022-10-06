@@ -40,14 +40,16 @@ program test_random_field
   !----------------------------------------!
   !   test random functions on a sphere    !
   !----------------------------------------!
+
+  ! get arguments
+  if(.not.found_command_argument('-lmax',lmax)) stop 'lmax missing'
+  if(.not.found_command_argument('-s',s)) stop 's missing'
+  if(.not.found_command_argument('-lambda',lambda)) stop 'lambda missing'
   
   ! build the grid
-  if(.not.found_command_argument('-lmax',lmax)) stop 'lmax missing'
   call grid%build(lmax)  
 
   ! allocate the random field
-  lambda = 0.5_dp
-  s = 2.0_dp
   call u%set(grid,lambda,s,real=.true.)
 
   ! allocate coefficient array and spatial array
