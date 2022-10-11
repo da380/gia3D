@@ -6,12 +6,13 @@ program test_random_field
   use module_random_fields
   implicit none
 
-  integer(i4b) :: lmax,l,ith,iph,io,inode,ispec,i
-  real(dp) :: lambda,s,th,ph,x1,x2,x,y,sigma
+  integer(i4b) :: lmax,l,ith,iph,io,inode,ispec,i,nx
+  real(dp) :: lambda,s,th,ph,x1,x2,x,y,sigma,dx
   real(dp), dimension(:,:), allocatable :: v
   type(gauss_legendre_grid) :: grid
   type(gaussain_random_scalar_field_sphere) :: u
-  type(gaussian_random_scalar_field_interval) :: w
+  type(interp_1D_cubic) :: fun
+  class(GRF_1D), allocatable :: rfun
 
 
   !---------------------------------------------!
@@ -24,19 +25,18 @@ program test_random_field
   if(.not.found_command_argument('-lambda',lambda)) stop 'lambda missing'
   if(.not.found_command_argument('-sigma',sigma)) stop 'sigma missing'
   
-  call w%build(x1,x2,lambda,s,sigma)
-!  call w%set_mean(f)  
-  call w%realise()
-  
-  
-  open(newunit = io,file='random.out')
-  do ispec = w%ispec1,w%ispec2
-     do inode = 1,w%ngll
+  rfun = GRF_1D_SEM(x1,x2,lambda,s,sigma)
 
-        i = w%ibool(inode,ispec)
-        write(io,*) w%x(inode,ispec),w%u(i)
-        
-     end do
+  call rfun%realise(fun)
+
+
+  
+  nx = 10*(x2-x1)/lambda
+  dx = (x2-x1)/(nx-1)
+  open(newunit = io,file='random.out')
+  do i = 1,nx
+     x = x1 + (i-1)*dx
+     write(io,*) x,fun%f(x)
   end do
   close(io)
   

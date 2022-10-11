@@ -5,93 +5,62 @@ module module_random_fields
   use module_error
   use module_quadrature
   use module_interp
+  use module_fftw3
   use module_spherical_harmonics
+  use, intrinsic :: iso_c_binding
   implicit none
-
-
-  type, abstract :: GRSF_interval
-     real(dp) :: x1
-     real(dp) :: x2
+ 
+  type, abstract :: GRF_1D
    contains
-     procedure(GRSF_I_delete),  deferred :: delete
-     procedure(GRSF_I_realise), deferred :: realise
-  end type GRSF_interval
+     procedure(GRF_1D_delete),  deferred :: delete
+     procedure(GRF_1D_realise), deferred :: realise
+  end type GRF_1D
 
   abstract interface
-     subroutine GRSF_I_delete(self)
-       import :: GRSF_interval
-       class(GRSF_interval), intent(inout) :: self
-     end subroutine GRSF_I_delete
-     subroutine GRSF_I_realise(self,fun)
+     subroutine GRF_1D_delete(self)
+       import :: GRF_1D
+       class(GRF_1D), intent(inout) :: self
+     end subroutine GRF_1D_delete
+     subroutine GRF_1D_realise(self,fun)
        use module_interp
-       import :: GRSF_interval
-       class(GRSF_interval), intent(inout) :: self
+       import :: GRF_1D
+       class(GRF_1D), intent(inout) :: self
        class(interp_1D), intent(inout) :: fun
-     end subroutine GRSF_I_realise
+     end subroutine GRF_1D_realise
   end interface
 
-  type, abstract, extends(GRSF_interval) :: GRSF_interval_SEM
-!     logical :: allocated = .false.
-!     logical :: pad       = .true.
-!     integer(i4b) :: n
-!     integer(i4b) :: ngll=5
-!     integer(i4b) :: nspec
-!     integer(i4b) :: ispec1
-!     integer(i4b) :: ispec2
-!     integer(i4b) :: npad = 2
-!     integer(i4b), dimension(:,:), allocatable :: ibool
-!     real(dp) :: eps = 1.e-4_dp
-!     real(dp), dimension(:), allocatable :: mn
-!     real(dp), dimension(:), allocatable :: u
-!     real(dp), dimension(:), allocatable :: Qn
-!     real(dp), dimension(:,:), allocatable :: evec
-!     real(dp), dimension(:), allocatable :: w
-!     real(dp), dimension(:), allocatable :: jac
-!     real(dp), dimension(:,:), allocatable :: hp
-!     real(dp), dimension(:,:), allocatable :: x
-   contains
-!     procedure :: delete => delete_gaussian_random_scalar_field_interval
-!     procedure :: build => build_gaussian_random_scalar_field_interval
-!     procedure :: set_mean_coefficients_gaussian_random_scalar_field_interval
-!     procedure :: set_mean_values_gaussian_random_scalar_field_interval
-!     generic   :: set_mean => set_mean_coefficients_gaussian_random_scalar_field_interval, &
-!                              set_mean_values_gaussian_random_scalar_field_interval
-!     procedure :: realise => realise_gaussian_random_scalar_field_interval
-  end type GRSF_interval_SEM
-
-  
-  type :: gaussian_random_scalar_field_interval
-     ! main parameters
+  type, extends(GRF_1D) :: GRF_1D_SEM
      logical :: allocated = .false.
-     logical :: pad       = .true.
-     integer(i4b) :: n
-     real(dp) :: eps = 1.e-4_dp
+     integer(i4b) :: ndim
+     integer(i4b) :: mdim
      real(dp), dimension(:), allocatable :: mn
-     real(dp), dimension(:), allocatable :: u
      real(dp), dimension(:), allocatable :: Qn
-     real(dp), dimension(:,:), allocatable :: evec
-     ! mesh parameters
-     integer(i4b) :: ngll=5
-     integer(i4b) :: nspec
-     integer(i4b) :: ispec1
-     integer(i4b) :: ispec2
-     integer(i4b) :: npad = 2
-     integer(i4b), dimension(:,:), allocatable :: ibool
-     real(dp) :: x1,x2
-     real(dp), dimension(:), allocatable :: w
-     real(dp), dimension(:), allocatable :: jac
-     real(dp), dimension(:,:), allocatable :: hp
-     real(dp), dimension(:,:), allocatable :: x
+     real(dp), dimension(:), allocatable :: x
+     real(dp), dimension(:,:), allocatable :: evec     
    contains
-     procedure :: delete => delete_gaussian_random_scalar_field_interval
-     procedure :: build => build_gaussian_random_scalar_field_interval
-     procedure :: set_mean_coefficients_gaussian_random_scalar_field_interval
-     procedure :: set_mean_values_gaussian_random_scalar_field_interval
-     generic   :: set_mean => set_mean_coefficients_gaussian_random_scalar_field_interval, &
-                              set_mean_values_gaussian_random_scalar_field_interval
-     procedure :: realise => realise_gaussian_random_scalar_field_interval
-  end type gaussian_random_scalar_field_interval
+     procedure :: delete => delete_GRF_1D_SEM
+     procedure :: realise => realise_GRF_1D_SEM
+  end type GRF_1D_SEM
 
+  interface GRF_1D_SEM
+     procedure :: build_GRF_1D_SEM
+  end interface GRF_1D_SEM
+
+  type, extends(GRF_1D) :: GRF_1D_Fourier
+     logical :: allocated = .false.
+     integer(i4b) :: n    
+     real(dp), dimension(:), allocatable :: mn
+     real(dp), dimension(:), allocatable :: Qn
+     type(C_PTR) :: plan_r2c
+     type(C_PTR) :: plan_c2r
+   contains
+     procedure :: delete => delete_GRF_1D_Fourier
+     procedure :: realise => realise_GRF_1D_Fourier
+  end type GRF_1D_Fourier
+
+  interface GRF_1D_Fourier
+          procedure :: build_GRF_1D_Fourier
+  end interface GRF_1D_Fourier
 
    
   type gaussain_random_scalar_field_sphere
@@ -110,51 +79,97 @@ module module_random_fields
      procedure :: realise => realise_gaussain_random_scalar_field_sphere
   end type gaussain_random_scalar_field_sphere
 
-
-
-  
   
 contains
 
+
   !====================================================!
-  !            random fields on an interval            !
+  !                 1D fields using SEM                !
   !====================================================!
   
-
-  subroutine delete_gaussian_random_scalar_field_interval(self)
-    class(gaussian_random_scalar_field_interval), intent(inout) :: self
+  subroutine delete_GRF_1D_SEM(self)
+    class(GRF_1D_SEM), intent(inout) :: self
     if(.not.self%allocated) return
-    deallocate(self%w,self%jac,self%hp,self%x)
+    deallocate(self%mn,   &
+               self%Qn,   & 
+               self%x,    &          
+               self%evec)
     self%allocated = .false.
     return
-  end subroutine delete_gaussian_random_scalar_field_interval
+  end subroutine delete_GRF_1D_SEM
 
 
-  subroutine build_gaussian_random_scalar_field_interval(self,x1,x2,lambda,s,sigma,ngll,pad,npad,eps)
-    class(gaussian_random_scalar_field_interval), intent(inout) :: self
+  subroutine realise_GRF_1D_SEM(self,fun)
+    class(GRF_1D_SEM), intent(inout) :: self
+    class(interp_1D), intent(inout) :: fun
+
+    integer(i4b) :: ispec,inode,i,j
+    real(dp), dimension(self%ndim) :: un
+    real(dp), dimension(self%mdim) :: u
+
+    call random_seed()
+    call normal_random_variable(un)
+    un = self%mn + un*sqrt(self%Qn)
+    u = 0.0_dp
+    do i = 1,self%ndim
+      u(:) = u(:) + un(i)*self%evec(:,i)
+    end do
+    call fun%set(self%x,u)    
+    return
+  end subroutine realise_GRF_1D_SEM
+
+
+
+  type(GRF_1D_SEM) function build_GRF_1D_SEM(x1,x2,lambda,s,sigma,   &
+                                             pad,ngll,npad,eps,mfun) &
+                                             result(rfun)
+    
     real(dp), intent(in) :: x1,x2,lambda,s,sigma
-    integer(i4b), intent(in), optional :: ngll
-    logical, intent(in), optional :: pad
-    integer(i4b), intent(in), optional :: npad
+    logical, intent(in), optional  :: pad
+    integer(i4b), intent(in), optional :: ngll,npad
     real(dp), intent(in), optional :: eps
-    
+    class(interp_1D), intent(in), optional  :: mfun
+
+    logical, parameter :: pad_default = .true.
+    integer(i4b), parameter :: ngll_default = 5
+    integer(i4b), parameter :: npad_default = 3
+    real(dp), parameter :: eps_default = 1.e-4_dp
+
+    logical :: pad_loc
     integer(i4b) :: inode,ispec,count,kda,ldab,kdb,ldbb, &
-                    ndim,i,j,k,jnode,knode,info,nmax
-    real(dp) :: x11,x22,xl,xr,dx,fac,sum
-    real(dp), dimension(:), allocatable :: eval,work
-    real(dp), dimension(:,:), allocatable :: aa,bb,evec
+                    ndim,i,j,k,jnode,knode,info,nmax,ngll_loc, &
+                    npad_loc,nspec,ispec1,ispec2,i1,i2
+    integer(i4b), dimension(:,:), allocatable :: ibool
+    real(dp) :: x11,x22,xl,xr,dx,fac,sum,x,eps_loc
+    real(dp), dimension(:), allocatable :: eval,work,jac
+    real(dp), dimension(:,:), allocatable :: aa,bb,evec,hp,xx
     type(gauss_lobatto_quadrature) :: quad
+
     
-    ! deallocate if necessary
-    call self%delete()
     
     ! deal with optional arguments
-    if(present(ngll)) self%ngll = ngll
-    if(present(pad)) self%pad = pad
-    if(present(npad)) self%npad = npad
-    if(present(npad)) self%eps = eps
+    if(present(pad)) then
+       pad_loc = pad
+    else
+       pad_loc = pad_default
+    end if
+    if(present(ngll)) then
+       ngll_loc = ngll
+    else
+       ngll_loc = ngll_default
+    end if
+    if(present(npad)) then
+       npad_loc = npad
+    else
+       npad_loc = npad_default
+    end if
+    if(present(eps)) then
+       eps_loc = eps
+    else
+       eps_loc = eps_default
+    end if
 
-
+    
     ! estimate the cutoff eigenvalue
     nmax = 0
     sum = 0.0_dp
@@ -162,81 +177,80 @@ contains
        fac = 1.0_dp + (lambda*pi*nmax/(x2-x1))**2
        fac = fac**(-s)
        sum = sum + fac
-       if(fac/sum < self%eps) exit
+       if(fac/sum < eps_loc) exit
        nmax = nmax+1
     end do
     
     ! work out the mesh size
     dx = 0.5_dp*(x2-x1)/nmax
-    self%nspec = (x2-x1)/dx
-    dx = (x2-x1)/self%nspec
-    
-    if(self%pad) then
-       self%nspec = self%nspec + 2*self%npad
-       x11 = x1 - self%npad*dx
-       x22 = x2 + self%npad*dx
-       self%ispec1 = 1 + self%npad
-       self%ispec2 = self%nspec - self%npad
+    nspec = (x2-x1)/dx
+    dx = (x2-x1)/nspec
+    if(pad_loc) then
+       nspec = nspec + 2*npad_loc
+       x11 = x1 - npad_loc*dx
+       x22 = x2 + npad_loc*dx
+       ispec1 = 1 + npad_loc
+       ispec2 = nspec - npad_loc
     else
        x11 = x1
        x22 = x2
-       self%ispec1 = 1
-       self%ispec2 = self%nspec
+       ispec1 = 1
+       ispec2 = nspec
     end if
-        
+
+    
     ! allocate the mesh arrays
-    allocate(self%w(self%ngll))
-    allocate(self%hp(self%ngll,self%ngll))
-    allocate(self%jac(self%nspec))
-    allocate(self%x(self%ngll,self%nspec))
-    allocate(self%ibool(self%ngll,self%nspec))
+    allocate(hp(ngll_loc,ngll_loc))
+    allocate(jac(nspec))
+    allocate(xx(ngll_loc,nspec))
+    allocate(ibool(ngll_loc,nspec))
+
     
     ! get the gll points and weights  
-    call quad%set(self%ngll)
-    self%w = quad%w
-    do inode = 1,self%ngll
-       call lagrange_polynomial(quad%x(inode),self%ngll,quad%x,self%x(:,1),self%hp(inode,:))
+    call quad%set(ngll_loc)
+    do inode = 1,ngll_loc
+       call lagrange_polynomial(quad%x(inode),ngll_loc,quad%x,xx(:,1),hp(inode,:))
     end do
-
+    
     ! build up the mesh
     xl = x11
     count = 0
-    do ispec = 1,self%nspec
+    do ispec = 1,nspec
        xr = xl + dx
-       self%jac(ispec) = 0.5_dp*(xr-xl)
-       do inode = 1,self%ngll
-          self%x(inode,ispec) = xl + 0.5_dp*(xr-xl)*(quad%x(inode)+1.0_dp)
+       jac(ispec) = 0.5_dp*(xr-xl)
+       do inode = 1,ngll_loc
+          xx(inode,ispec) = xl + 0.5_dp*(xr-xl)*(quad%x(inode)+1.0_dp)
           count = count + 1
-          self%ibool(inode,ispec) = count
+          ibool(inode,ispec) = count
        end do       
        xl = xr
        count = count-1
     end do
     
     ! allocate the matrices
-    ndim = self%ibool(self%ngll,self%nspec)    
-    kda  = self%ngll-1
+    ndim = ibool(ngll_loc,nspec)
+    kda  = ngll_loc-1
     ldab = kda+1
     kdb  = 0
     ldbb = kdb+1
     allocate(aa(ldab,ndim),bb(ldbb,ndim))
     aa = 0.0_dp
     bb = 0.0_dp
-
+    
     ! build the matrices
-    do ispec = 1,self%nspec
-       do inode = 1,self%ngll
-          i = self%ibool(inode,ispec)
+    do ispec = 1,nspec
+       do inode = 1,ngll_loc
+          i = ibool(inode,ispec)
           k = kdb+1
-          bb(k,i) = bb(k,i) + self%w(inode)*self%jac(ispec)
-          do jnode = inode,self%ngll
-             j = self%ibool(jnode,ispec)
+          bb(k,i) = bb(k,i) + quad%w(inode)*jac(ispec)
+          do jnode = inode,ngll_loc
+             j = ibool(jnode,ispec)
              k = kda+1+i-j
-             do knode = 1,self%ngll
-                aa(k,j) = aa(k,j) + self%hp(knode,inode) &
-                                  * self%hp(knode,jnode) &
-                                  * self%w(knode)        & 
-                                  / self%jac(ispec)
+             do knode = 1,ngll_loc
+                aa(k,j) = aa(k,j) + hp(knode,inode) &
+                                  * hp(knode,jnode) &
+                                  * quad%w(knode)   & 
+                                  / jac(ispec)
              end do
           end do
        end do
@@ -247,93 +261,113 @@ contains
     allocate(evec(ndim,ndim))
     allocate(work(3*ndim-2))
     call dsbgv('V','U',ndim,kda,kdb,aa,ldab,bb,ldbb,eval,evec,ndim,work,info)
-    call check(info == 0,'set_gaussian_random_scalar_field_interval','problem with eigendecomposition')
+    call check(info == 0,'set_gaussian_random_scalar_field_1D','problem with eigendecomposition')
     eval(1) = 0.0_dp
+
     
     ! work out eigenvalue cutoff
-    self%n = min(nmax,ndim)
-
+    rfun%ndim = min(nmax,ndim)
     
     ! store the eigenvectors
-    allocate(self%evec(ndim,self%n))
-    self%evec(:,:) = evec(:,1:self%n)
+    i1 = ibool(1,ispec1)
+    i2 = ibool(ngll_loc,ispec2)
+    rfun%mdim = i2-i1+1
 
+    
+    allocate(rfun%evec(rfun%mdim,rfun%ndim),rfun%x(rfun%mdim))
+    do i = 1,rfun%ndim
+       rfun%evec(:,i) = evec(i1:i2,i)       
+    end do
+    do ispec = ispec1,ispec2
+       do inode = 1,ngll_loc
+          i = ibool(inode,ispec)-i1+1
+          rfun%x(i) = xx(inode,ispec)
+       end do
+    end do
+
+    
     ! set the covariance
-    allocate(self%Qn(self%n))
-    self%Qn(:) = (1.0_dp + lambda*lambda*eval(1:self%n))**(-s)
+    allocate(rfun%Qn(rfun%ndim))
+    rfun%Qn(:) = (1.0_dp + lambda*lambda*eval(1:rfun%ndim))**(-s)
     sum = 0.0_dp
     j = ndim/2
-    do i = 1,self%n
-       sum = sum + self%Qn(i)*self%evec(j,i)**2
+    do i = 1,rfun%ndim
+       sum = sum + rfun%Qn(i)*rfun%evec(j,i)**2
     end do
-    self%Qn = sigma*sigma*self%Qn/sum
-    
-    ! allocate array for the mean coefficients and realised function
-    allocate(self%mn(self%n),self%u(ndim))
-    self%mn = 0.0_dp
-    self%u  = 0.0_dp
-    
-    ! finish up
-    self%allocated = .true.
-    
-    return
-  end subroutine build_gaussian_random_scalar_field_interval
+    rfun%Qn = sigma*sigma*rfun%Qn/sum
 
+    ! allocate array for the mean coefficients
+    allocate(rfun%mn(rfun%ndim))
+    rfun%mn = 0.0_dp
 
-  
-
-  
-  subroutine set_mean_coefficients_gaussian_random_scalar_field_interval(self,mn)
-    class(gaussian_random_scalar_field_interval), intent(inout) :: self
-    real(dp), dimension(self%n), intent(in) :: mn
-    self%mn = mn
-    return
-  end subroutine set_mean_coefficients_gaussian_random_scalar_field_interval
-
-
-  subroutine set_mean_values_gaussian_random_scalar_field_interval(self,mfun)
-    class(gaussian_random_scalar_field_interval), intent(inout) :: self
-    interface r2r
-       real(dp) function r2r(x) result(f)
-         use module_constants
-         real(dp), intent(in) :: x
-       end function r2r
-    end interface r2r
-    procedure(r2r) :: mfun
-    integer(i4b) :: i,inode,ispec,j
-    real(dp) :: x,sum
-    do i = 1,self%n
-       sum = 0.0_dp
-       do ispec = 1,self%nspec
-          do inode = 1,self%ngll
-             j = self%ibool(inode,ispec)
-             x = self%x(inode,ispec)
-             sum = sum + mfun(x)*self%evec(j,i)*self%w(inode)*self%jac(ispec)
+    ! expand the mean function
+    if(present(mfun)) then
+       do i = 1,rfun%ndim
+          sum = 0.0_dp
+          do ispec = 1,nspec
+             do inode = 1,ngll_loc
+                j = ibool(inode,ispec)
+                x = xx(inode,ispec)
+                sum = sum + mfun%f(x)*evec(j,i)*quad%w(inode)*jac(ispec)
+             end do
           end do
+          rfun%mn(i) = sum
        end do
-       self%mn(i) = sum
-    end do
+    end if
+       
+    ! finish up
+    rfun%allocated = .true.
+ 
     return
-  end subroutine set_mean_values_gaussian_random_scalar_field_interval
+  end function build_GRF_1D_SEM
+
+
+  !====================================================!
+  !                 1D fields using FFT                !
+  !====================================================!
   
-
-  subroutine realise_gaussian_random_scalar_field_interval(self)
-    class(gaussian_random_scalar_field_interval), intent(inout) :: self
-
-    integer(i4b) :: i
-    real(dp), dimension(self%n) :: un
-    call random_seed()
-    call normal_random_variable(un)
-    un = self%mn + un*sqrt(self%Qn)
-    self%u = 0.0_dp
-    do i = 1,self%n
-       self%u(:) = self%u(:) + un(i)*self%evec(:,i)
-    end do
+  
+  subroutine delete_GRF_1D_Fourier(self)
+    class(GRF_1D_Fourier), intent(inout) :: self
+    if(.not.self%allocated) return
+    deallocate(self%mn,   &
+               self%Qn)
+    self%allocated = .false.
     return
-  end subroutine realise_gaussian_random_scalar_field_interval
+  end subroutine delete_GRF_1D_Fourier
 
 
+  subroutine realise_GRF_1D_Fourier(self,fun)
+    class(GRF_1D_Fourier), intent(inout) :: self
+    class(interp_1D), intent(inout) :: fun
 
+    integer(i4b) :: n
+    real(C_DOUBLE), pointer :: out(:)
+    complex(C_DOUBLE_COMPLEX), pointer :: in(:)
+    type(C_PTR) :: pin,pout
+
+    n = self%n    
+    call random_seed()
+!    call normal_random_variable(un)
+!    un = self%mn + un*sqrt(self%Qn)
+
+
+    ! set up the C pointers
+    pin = fftw_alloc_complex(int(n/2+1, C_SIZE_T))
+    pout  = fftw_alloc_real(int(n, C_SIZE_T))
+    call c_f_pointer(pin, in, [n/2+1])
+    call c_f_pointer(pout,   out, [n])
+    call fftw_execute_dft_c2r(self%plan_c2r,in,out)
+    
+!    call fun%set(out,out)
+    
+    return
+  end subroutine realise_GRF_1D_Fourier
+
+
+  type(GRF_1D_Fourier) function build_GRF_1D_Fourier() result(rfun)
+    return
+  end function build_GRF_1D_Fourier
   
   !====================================================!
   !              random fields on a sphere             !
