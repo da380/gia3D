@@ -470,7 +470,7 @@ contains
     integer(i4b), intent(in) :: n
     real(dp), dimension(n), intent(in) :: xn
     real(dp), dimension(n), intent(out) :: h
-    real(dp), dimension(n), intent(out) :: hp
+    real(dp), dimension(n), intent(out), optional :: hp
 
     integer(i4b) :: i,j,k
     real(dp) :: prod1,prod2
@@ -487,19 +487,22 @@ contains
        end do
        h(i) = prod1/prod2
 
-       hp(i) = 0.0_dp
-       do j = 1,n
-          if(j /= i) then
-             prod1 = 1.0_dp
-             do k = 1,n
-                if(k /= i .and. k/= j) then
-                   prod1 = prod1*(x-xn(k))
-                end if
-             end do
-             hp(i) = hp(i) + prod1
-          end if
-       end do
-       hp(i) = hp(i)/prod2
+       if(present(hp)) then       
+          hp(i) = 0.0_dp
+          do j = 1,n
+             if(j /= i) then
+                prod1 = 1.0_dp
+                do k = 1,n
+                   if(k /= i .and. k/= j) then
+                      prod1 = prod1*(x-xn(k))
+                   end if
+                end do
+                hp(i) = hp(i) + prod1
+             end if
+          end do
+          hp(i) = hp(i)/prod2
+       end if
+       
     end do
 
 
