@@ -6,12 +6,13 @@ program test_random_field
   use module_random_fields
   implicit none
 
-  integer(i4b) :: lmax,l,ith,iph,io,inode,ispec,i,nx
-  real(dp) :: lambda,s,th,ph,x1,x2,x,y,sigma,dx
+  integer(i4b) :: lmax,l,ith,iph,io,inode,ispec,i,nx,n
+  real(dp) :: lambda,s,th,ph,x1,x2,x,y,sigma,dx,x0
+  real(dp), dimension(:), allocatable :: xx,ff
   real(dp), dimension(:,:), allocatable :: v
   type(gauss_legendre_grid) :: grid
   type(gaussain_random_scalar_field_sphere) :: u
-  type(interp_1D_cubic) :: fun
+  type(interp_1D_cubic) :: fun,cfun
   class(GRF_1D), allocatable :: rfun
 
 
@@ -24,22 +25,37 @@ program test_random_field
   if(.not.found_command_argument('-s',s)) stop 's missing'
   if(.not.found_command_argument('-lambda',lambda)) stop 'lambda missing'
   if(.not.found_command_argument('-sigma',sigma)) stop 'sigma missing'
-  
-  rfun = GRF_1D_SEM(x1,x2,lambda,s,sigma)
 
+
+  ! set the mean function
+  n  = 100
+  dx = (x2-x1)/(n-1)
+  allocate(xx(n),ff(n))
+  do i = 1,n
+     x = x1 + (i-1)*dx
+     xx(i) = x
+     ff(i) = x**2*sin(3*x)
+  end do
+
+!  rfun = GRF_1D_SEM(x1,x2,lambda,s,sigma)
+  rfun = GRF_1D_Fourier(x1,x2,lambda,s,sigma)
+
+  x0 = 0.5_dp
+  call rfun%corr(x0,cfun)
   call rfun%realise(fun)
-
-
   
-  nx = 10*(x2-x1)/lambda
+  nx = 20*(x2-x1)/lambda
   dx = (x2-x1)/(nx-1)
+  x0 = 0.3_dp
   open(newunit = io,file='random.out')
   do i = 1,nx
      x = x1 + (i-1)*dx
-     write(io,*) x,fun%f(x)
+     write(io,*) x,fun%f(x),cfun%f(x)
   end do
   close(io)
   
+
+
   
  
   
@@ -81,14 +97,6 @@ program test_random_field
 
   
 
-contains
-
-
-  real(dp) function f(x) result(y)
-    real(dp), intent(in) :: x
-    y = 4.0_dp*x*(1-x)
-    return
-  end function f
   
   
   

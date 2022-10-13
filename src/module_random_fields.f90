@@ -14,6 +14,7 @@ module module_random_fields
    contains
      procedure(GRF_1D_delete),  deferred :: delete
      procedure(GRF_1D_realise), deferred :: realise
+     procedure(GRF_1D_corr), deferred :: corr
   end type GRF_1D
 
   abstract interface
@@ -27,19 +28,27 @@ module module_random_fields
        class(GRF_1D), intent(inout) :: self
        class(interp_1D), intent(inout) :: fun
      end subroutine GRF_1D_realise
+     subroutine GRF_1D_corr(self,y,fun)
+       use module_constants
+       use module_interp
+       import :: GRF_1D
+       class(GRF_1D), intent(in) :: self
+       real(dp), intent(in) :: y
+       class(interp_1D), intent(inout) :: fun
+     end subroutine GRF_1D_corr
   end interface
 
   type, extends(GRF_1D) :: GRF_1D_SEM
      logical :: allocated = .false.
      integer(i4b) :: ndim
      integer(i4b) :: mdim
-     real(dp), dimension(:), allocatable :: mn
-     real(dp), dimension(:), allocatable :: Qn
+     real(dp), dimension(:), allocatable :: Q
      real(dp), dimension(:), allocatable :: x
      real(dp), dimension(:,:), allocatable :: evec     
    contains
      procedure :: delete => delete_GRF_1D_SEM
      procedure :: realise => realise_GRF_1D_SEM
+     procedure :: corr => corr_GRF_1D_SEM
   end type GRF_1D_SEM
 
   interface GRF_1D_SEM
@@ -48,14 +57,14 @@ module module_random_fields
 
   type, extends(GRF_1D) :: GRF_1D_Fourier
      logical :: allocated = .false.
-     integer(i4b) :: n    
-     real(dp), dimension(:), allocatable :: mn
-     real(dp), dimension(:), allocatable :: Qn
-     type(C_PTR) :: plan_r2c
+     integer(i4b) :: n,i1,i2     
+     real(dp), dimension(:), allocatable :: x
+     real(dp), dimension(:), allocatable :: Q
      type(C_PTR) :: plan_c2r
    contains
      procedure :: delete => delete_GRF_1D_Fourier
      procedure :: realise => realise_GRF_1D_Fourier
+     procedure :: corr => corr_GRF_1D_Fourier
   end type GRF_1D_Fourier
 
   interface GRF_1D_Fourier
@@ -90,8 +99,7 @@ contains
   subroutine delete_GRF_1D_SEM(self)
     class(GRF_1D_SEM), intent(inout) :: self
     if(.not.self%allocated) return
-    deallocate(self%mn,   &
-               self%Qn,   & 
+    deallocate(self%Q,   & 
                self%x,    &          
                self%evec)
     self%allocated = .false.
@@ -109,7 +117,7 @@ contains
 
     call random_seed()
     call normal_random_variable(un)
-    un = self%mn + un*sqrt(self%Qn)
+    un = un*sqrt(self%Q)
     u = 0.0_dp
     do i = 1,self%ndim
       u(:) = u(:) + un(i)*self%evec(:,i)
@@ -118,51 +126,52 @@ contains
     return
   end subroutine realise_GRF_1D_SEM
 
+  
+  subroutine corr_GRF_1D_SEM(self,y,fun)
+    class(GRF_1D_SEM), intent(in) :: self
+    real(dp), intent(in) :: y
+    class(interp_1D), intent(inout) :: fun
 
+    integer(i4b) :: iy,i,n
+    real(dp) :: v1,v2,v,y1,y2
+    real(dp), dimension(self%mdim) :: u
 
-  type(GRF_1D_SEM) function build_GRF_1D_SEM(x1,x2,lambda,s,sigma,   &
-                                             pad,ngll,npad,eps,mfun) &
+    iy = bisect_list(self%x,y)
+    y1 = self%x(iy)
+    y2 = self%x(iy+1)
+    u = 0.0_dp
+    do i = 1,self%ndim
+       v1 = self%evec(iy,i)
+       v2 = self%evec(iy+1,i)
+       v = v1 + (v2-v1)*(y-y1)/(y2-y1)
+       u(:) = u(:) + self%Q(i)*v*self%evec(:,i)
+    end do
+    call fun%set(self%x,u)    
+    
+    return
+  end subroutine corr_GRF_1D_SEM
+  
+
+  type(GRF_1D_SEM) function build_GRF_1D_SEM(x1,x2,lambda,s,sigma,eps) &
                                              result(rfun)
     
     real(dp), intent(in) :: x1,x2,lambda,s,sigma
-    logical, intent(in), optional  :: pad
-    integer(i4b), intent(in), optional :: ngll,npad
     real(dp), intent(in), optional :: eps
-    class(interp_1D), intent(in), optional  :: mfun
 
-    logical, parameter :: pad_default = .true.
-    integer(i4b), parameter :: ngll_default = 5
-    integer(i4b), parameter :: npad_default = 3
-    real(dp), parameter :: eps_default = 1.e-4_dp
+    integer(i4b), parameter :: ngll = 5
+    integer(i4b), parameter :: npad = 10
+    real(dp), parameter :: eps_default = 1.e-5_dp
 
-    logical :: pad_loc
     integer(i4b) :: inode,ispec,count,kda,ldab,kdb,ldbb, &
-                    ndim,i,j,k,jnode,knode,info,nmax,ngll_loc, &
-                    npad_loc,nspec,ispec1,ispec2,i1,i2
+                    ndim,i,j,k,jnode,knode,info,nmax,    &
+                    nspec,ispec1,ispec2,i1,i2
     integer(i4b), dimension(:,:), allocatable :: ibool
-    real(dp) :: x11,x22,xl,xr,dx,fac,sum,x,eps_loc
+    real(dp) :: x11,x22,xl,xr,dx,fac,sum,x,eps_loc,x0
     real(dp), dimension(:), allocatable :: eval,work,jac
     real(dp), dimension(:,:), allocatable :: aa,bb,evec,hp,xx
     type(gauss_lobatto_quadrature) :: quad
 
-    
-    
-    ! deal with optional arguments
-    if(present(pad)) then
-       pad_loc = pad
-    else
-       pad_loc = pad_default
-    end if
-    if(present(ngll)) then
-       ngll_loc = ngll
-    else
-       ngll_loc = ngll_default
-    end if
-    if(present(npad)) then
-       npad_loc = npad
-    else
-       npad_loc = npad_default
-    end if
+        
     if(present(eps)) then
        eps_loc = eps
     else
@@ -182,34 +191,26 @@ contains
     end do
     
     ! work out the mesh size
-    dx = 0.5_dp*(x2-x1)/nmax
+    dx = (x2-x1)/nmax
     nspec = (x2-x1)/dx
     dx = (x2-x1)/nspec
-    if(pad_loc) then
-       nspec = nspec + 2*npad_loc
-       x11 = x1 - npad_loc*dx
-       x22 = x2 + npad_loc*dx
-       ispec1 = 1 + npad_loc
-       ispec2 = nspec - npad_loc
-    else
-       x11 = x1
-       x22 = x2
-       ispec1 = 1
-       ispec2 = nspec
-    end if
-
+    nspec = nspec + 2*npad
+    x11 = x1 - npad*dx
+    x22 = x2 + npad*dx
+    ispec1 = 1 + npad
+    ispec2 = nspec - npad
     
     ! allocate the mesh arrays
-    allocate(hp(ngll_loc,ngll_loc))
+    allocate(hp(ngll,ngll))
     allocate(jac(nspec))
-    allocate(xx(ngll_loc,nspec))
-    allocate(ibool(ngll_loc,nspec))
+    allocate(xx(ngll,nspec))
+    allocate(ibool(ngll,nspec))
 
     
     ! get the gll points and weights  
-    call quad%set(ngll_loc)
-    do inode = 1,ngll_loc
-       call lagrange_polynomial(quad%x(inode),ngll_loc,quad%x,xx(:,1),hp(inode,:))
+    call quad%set(ngll)
+    do inode = 1,ngll
+       call lagrange_polynomial(quad%x(inode),ngll,quad%x,xx(:,1),hp(inode,:))
     end do
     
     ! build up the mesh
@@ -218,7 +219,7 @@ contains
     do ispec = 1,nspec
        xr = xl + dx
        jac(ispec) = 0.5_dp*(xr-xl)
-       do inode = 1,ngll_loc
+       do inode = 1,ngll
           xx(inode,ispec) = xl + 0.5_dp*(xr-xl)*(quad%x(inode)+1.0_dp)
           count = count + 1
           ibool(inode,ispec) = count
@@ -228,8 +229,8 @@ contains
     end do
     
     ! allocate the matrices
-    ndim = ibool(ngll_loc,nspec)
-    kda  = ngll_loc-1
+    ndim = ibool(ngll,nspec)
+    kda  = ngll-1
     ldab = kda+1
     kdb  = 0
     ldbb = kdb+1
@@ -239,14 +240,14 @@ contains
     
     ! build the matrices
     do ispec = 1,nspec
-       do inode = 1,ngll_loc
+       do inode = 1,ngll
           i = ibool(inode,ispec)
           k = kdb+1
           bb(k,i) = bb(k,i) + quad%w(inode)*jac(ispec)
-          do jnode = inode,ngll_loc
+          do jnode = inode,ngll
              j = ibool(jnode,ispec)
              k = kda+1+i-j
-             do knode = 1,ngll_loc
+             do knode = 1,ngll
                 aa(k,j) = aa(k,j) + hp(knode,inode) &
                                   * hp(knode,jnode) &
                                   * quad%w(knode)   & 
@@ -270,7 +271,7 @@ contains
     
     ! store the eigenvectors
     i1 = ibool(1,ispec1)
-    i2 = ibool(ngll_loc,ispec2)
+    i2 = ibool(ngll,ispec2)
     rfun%mdim = i2-i1+1
 
     
@@ -279,42 +280,22 @@ contains
        rfun%evec(:,i) = evec(i1:i2,i)       
     end do
     do ispec = ispec1,ispec2
-       do inode = 1,ngll_loc
+       do inode = 1,ngll
           i = ibool(inode,ispec)-i1+1
           rfun%x(i) = xx(inode,ispec)
        end do
     end do
-
     
     ! set the covariance
-    allocate(rfun%Qn(rfun%ndim))
-    rfun%Qn(:) = (1.0_dp + lambda*lambda*eval(1:rfun%ndim))**(-s)
+    allocate(rfun%Q(rfun%ndim))
+    rfun%Q(:) = (1.0_dp + lambda*lambda*eval(1:rfun%ndim))**(-s)
+    j = rfun%mdim/2
     sum = 0.0_dp
-    j = ndim/2
     do i = 1,rfun%ndim
-       sum = sum + rfun%Qn(i)*rfun%evec(j,i)**2
+       sum = sum + rfun%Q(i)*rfun%evec(j,i)**2
     end do
-    rfun%Qn = sigma*sigma*rfun%Qn/sum
+    rfun%Q = sigma*sigma*rfun%Q/sum
 
-    ! allocate array for the mean coefficients
-    allocate(rfun%mn(rfun%ndim))
-    rfun%mn = 0.0_dp
-
-    ! expand the mean function
-    if(present(mfun)) then
-       do i = 1,rfun%ndim
-          sum = 0.0_dp
-          do ispec = 1,nspec
-             do inode = 1,ngll_loc
-                j = ibool(inode,ispec)
-                x = xx(inode,ispec)
-                sum = sum + mfun%f(x)*evec(j,i)*quad%w(inode)*jac(ispec)
-             end do
-          end do
-          rfun%mn(i) = sum
-       end do
-    end if
-       
     ! finish up
     rfun%allocated = .true.
  
@@ -330,8 +311,8 @@ contains
   subroutine delete_GRF_1D_Fourier(self)
     class(GRF_1D_Fourier), intent(inout) :: self
     if(.not.self%allocated) return
-    deallocate(self%mn,   &
-               self%Qn)
+    deallocate(self%Q)
+    call fftw_destroy_plan(self%plan_c2r)
     self%allocated = .false.
     return
   end subroutine delete_GRF_1D_Fourier
@@ -341,31 +322,154 @@ contains
     class(GRF_1D_Fourier), intent(inout) :: self
     class(interp_1D), intent(inout) :: fun
 
-    integer(i4b) :: n
+    integer(i4b) :: i,n,i1,i2
+    real(dp) :: r1,r2
     real(C_DOUBLE), pointer :: out(:)
     complex(C_DOUBLE_COMPLEX), pointer :: in(:)
     type(C_PTR) :: pin,pout
 
-    n = self%n    
-    call random_seed()
-!    call normal_random_variable(un)
-!    un = self%mn + un*sqrt(self%Qn)
-
-
-    ! set up the C pointers
+    n = self%n
+    i1 = self%i1
+    i2 = self%i2
     pin = fftw_alloc_complex(int(n/2+1, C_SIZE_T))
     pout  = fftw_alloc_real(int(n, C_SIZE_T))
     call c_f_pointer(pin, in, [n/2+1])
     call c_f_pointer(pout,   out, [n])
+    call random_seed()
+    call normal_random_variable(r1)
+    in(1) = r1*sqrt(self%Q(1))
+    do i = 2,n/2+1
+       call normal_random_variable(r1,r2)
+       in(i) = (r1+ii*r2)*sqrt(self%Q(i))
+    end do
     call fftw_execute_dft_c2r(self%plan_c2r,in,out)
-    
-!    call fun%set(out,out)
+    call fun%set(self%x(i1:i2),out(i1:i2))
     
     return
   end subroutine realise_GRF_1D_Fourier
 
 
-  type(GRF_1D_Fourier) function build_GRF_1D_Fourier() result(rfun)
+  subroutine corr_GRF_1D_Fourier(self,y,fun)
+    class(GRF_1D_Fourier), intent(in) :: self
+    real(dp), intent(in) :: y
+    class(interp_1D), intent(inout) :: fun
+
+
+    integer(i4b) :: m,n,i1,i2
+    real(dp) :: th,y1,y2
+    real(C_DOUBLE), pointer :: out(:)
+    complex(C_DOUBLE_COMPLEX), pointer :: in(:)
+    type(C_PTR) :: pin,pout
+
+    n = self%n
+    i1 = self%i1
+    i2 = self%i2
+    y1 = self%x(1)
+    y2 = self%x(n)
+    th = twopi*(y-y1)/(y2-y1)
+    pin = fftw_alloc_complex(int(n/2+1, C_SIZE_T))
+    pout  = fftw_alloc_real(int(n, C_SIZE_T))
+    call c_f_pointer(pin, in, [n/2+1])
+    call c_f_pointer(pout,   out, [n])
+    in = 0.0_dp
+    do m = 1,n/2+1
+       in(m) = self%Q(m)*exp(-ii*(m-1)*th)
+    end do
+    call fftw_execute_dft_c2r(self%plan_c2r,in,out)
+    call fun%set(self%x(i1:i2),out(i1:i2))
+    
+    return
+  end subroutine corr_GRF_1D_Fourier
+  
+
+
+  
+  type(GRF_1D_Fourier) function build_GRF_1D_Fourier(x1,x2,lambda,s, &
+                                                    sigma,eps,fftw_flag) result(rfun)
+    real(dp), intent(in) :: x1,x2,lambda,s,sigma
+    real(dp), intent(in), optional :: eps
+    integer(C_INT), intent(in), optional :: fftw_flag
+    
+    integer(i4b), parameter :: npad = 10
+    real(dp), parameter :: eps_default = 1.0e-5_dp
+
+    integer(i4b) :: i,n,i1,i2,ne
+    real(dp) :: dx,x11,x22,k,eps_loc,fac,sum
+
+    real(C_DOUBLE), pointer :: out(:)
+    complex(C_DOUBLE_COMPLEX), pointer :: in(:)
+    type(C_PTR) :: pin,pout,plan
+    integer(C_INT) :: plan_flag
+
+    if(present(eps)) then
+       eps_loc = eps
+    else
+       eps_loc = eps_default
+    end if
+
+    if(present(fftw_flag)) then
+       plan_flag = fftw_flag
+    else
+       plan_flag = FFTW_MEASURE
+    end if
+
+    ! estimate the step size
+    k = 0.0_dp
+    sum = 0.0_dp    
+    do
+       fac = (1.0_dp+(lambda*k)**2)**(-s)
+       sum  = sum + fac
+       if(fac/sum < eps_loc) exit
+       k = k+1.0_dp
+    end do
+    dx = 0.5_dp/k
+
+    ! number of points and range
+    n = (x2-x1)/dx + 1
+    dx = (x2-x1)/(n-1)
+    n = n + 2*npad
+    x11 = x1-npad*dx
+    x22 = x2+npad*dx
+    rfun%i1 = 1+npad
+    rfun%i2 = n-npad
+
+    ! extend to next power of 2
+    ne = log(1.0_dp*n)/log(2.0_dp) + 1
+    n = 2**ne
+    rfun%n = n
+
+    ! set the points
+    allocate(rfun%x(n))
+    do i = 1,n
+       rfun%x(i) = x11 + (i-1)*dx
+    end do
+
+    ! set the covariance
+    allocate(rfun%Q(n/2+1))
+    sum = 0.0_dp
+    do i = 1,n/2+1
+       k = twopi*(i-1)/(dx*n)
+       fac = (1.0_dp+(lambda*k)**2)**(-s)
+       if(i == 1) then
+          sum = sum + fac
+       else
+          sum = sum + 2.0_dp*fac
+       end if
+       rfun%Q(i) = fac
+    end do
+    rfun%Q = sigma*sigma*rfun%Q/sum
+
+    ! set up fft plan
+    pin = fftw_alloc_complex(int(n/2+1, C_SIZE_T))
+    pout  = fftw_alloc_real(int(n, C_SIZE_T))
+    call c_f_pointer(pin,   in, [n/2+1])
+    call c_f_pointer(pout, out, [n])
+    plan = fftw_plan_dft_c2r_1d(n,in,out,plan_flag)
+    call fftw_free(pin)
+    call fftw_free(pout)
+    rfun%plan_c2r = plan
+    
+
     return
   end function build_GRF_1D_Fourier
   
