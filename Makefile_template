@@ -6,6 +6,9 @@ LOBJ=../obj/
 BIN=../bin/
 VPATH = $(BIN):$(LOBJ)
 
+CORE_LOBJ=../core/obj/
+CORE_MOD=../core/mod/
+
 # set the compiler 
 F95 = gfortran
 
@@ -17,7 +20,9 @@ FFTW3 = /usr/include/
 NETCDF = /usr/include/
 
 # set the flags
-FFLAGS =   -I../mod  -J../mod -O3  -I$(FFTW3) -I$(FFTW3_api) -I$(NETCDF)
+FFLAGS =   -I../mod  -J../mod  -I$(FFTW3) \
+           -I$(FFTW3_api) -I$(NETCDF)     \
+           -I$(CORE_MOD) -O3
 
 # libraries to link to
 LIBS =  -lfftw3 -lblas -llapack -lnetcdff
@@ -29,13 +34,35 @@ TEST=true
 MV=mv -f
 .PHONY = clean
 
+
+
+#####################################################
+#               list of core codes used             #
+#####################################################
+
+CORE_SRCS = module_constants.f90            \
+            module_physical_constants.f90   \
+	    module_error.f90                \
+            module_util.f90                 \
+            module_fftw3.f90                \
+            module_interp.f90               \
+            module_special_functions.f90    \
+            module_quadrature.f90           \
+            module_spherical_harmonics.f90  \
+            module_spherical_model.f90      \
+            module_PREM.f90                 \
+            module_DECK.f90                 
+
+CORE_OBJS = $(CORE_SRCS:%.f90=$(CORE_LOBJ)%.o)
+
 #####################################################
 #             list of excutable programs            #
 #####################################################
 
 # main programs
-SRCS = love_numbers.f90          \
-       sea_level_fingerprint.f90 
+SRCS = love_numbers.f90           \
+       sea_level_fingerprint.f90  \
+       load_greens_function.f90
 
 # add in testing programs if desired
 SRCS += test_special_functions.f90    \
@@ -48,26 +75,17 @@ SRCS += test_special_functions.f90    \
         test.f90                      \
         test_mesh.f90                 \
         test_matrix.f90               \
-        netcdf_test.f90               
+        netcdf_test.f90               \
+        test_random_field.f90
 
 
 
 ###########################################################
 #         list of modules (in order of dependency)        #
 ###########################################################
-MOD_SRCS = module_constants.f90            \
-           module_physical_constants.f90   \
-	   module_error.f90                \
-           module_util.f90                 \
-	   module_fftw3.f90                \
-           module_interp.f90               \
-	   module_special_functions.f90    \
-	   module_quadrature.f90           \
-           module_spherical_harmonics.f90  \
-           module_spherical_model.f90      \
-	   module_PREM.f90                 \
-	   module_DECK.f90                 \
-           module_mesh.f90                 \
+
+
+MOD_SRCS = module_mesh.f90                 \
 	   module_matrix.f90               \
            module_force.f90                \
            module_linear_solver.f90        \
@@ -90,7 +108,7 @@ BINEXCT  = $(EXCT:%=$(BIN)%)
 all: $(EXCT) 
 
 $(EXCT): %:  $(MOD_OBJS)  %.o
-	$(F95) $(FFLAGS) $^ $(LIBS) -o $(BIN)$@
+	$(F95) $(FFLAGS) $(CORE_OBJS) $^  $(LIBS) -o $(BIN)$@
 
 $(OBJS): $(LOBJ)%.o: %.f90 
 	$(F95) $(FFLAGS) $^  -c
