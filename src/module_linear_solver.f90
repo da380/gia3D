@@ -3,7 +3,7 @@ module module_linear_solver
   use module_constants
   use module_error
   use module_spherical_harmonics
-  use module_mesh
+  use module_spherical_mesh
   use module_matrix
   use module_force
   implicit none

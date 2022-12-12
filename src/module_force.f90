@@ -2,7 +2,7 @@ module module_force
 
   use module_constants
   use module_physical_constants
-  use module_mesh
+  use module_spherical_mesh
   use module_matrix
   implicit none
 
