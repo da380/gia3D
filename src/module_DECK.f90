@@ -105,7 +105,7 @@ contains
     logical :: isotropic,change,file_exists
     integer(i4b) :: io,iknot,nknot,ios,ncol,isec,i1,i2,ilay,i11,i22
     integer(i4b), dimension(:,:), allocatable :: sind
-    real(dp) :: tmp
+    real(dp) :: tmp,rt,rhot,vpvt,vsvt,vpht,vsht,etat
     real(dp), dimension(:), allocatable :: r,rho,vpv,vsv,vph,vsh,eta
 
     !------------------------------------!
@@ -123,25 +123,29 @@ contains
     else
        stop 'elastic_DECK: unexpected format'
     end if
+
     nknot = 0
+    allocate(r(0),rho(0),vpv(0),vsv(0),vph(0),vsh(0),eta(0))
     do
-       read(io,*,iostat = ios) tmp
+       if(isotropic) then
+          read(io,*,iostat = ios) rt,rhot,vpvt,vsvt
+          vpht = vpvt
+          vsht = vsvt
+          etat = 1.0_dp
+       else
+          read(io,*,iostat = ios) rt,rhot,vpvt,vsvt,vpht,vsht,etat
+       end if
        if(ios /= 0) exit
        nknot = nknot + 1
+       r   = [r,rt]
+       rho = [rho,rhot]
+       vpv = [vpv,vpvt]
+       vsv = [vsv,vsvt]
+       vph = [vph,vpht]
+       vsh = [vsh,vsht]
+       eta = [eta,etat]
     end do
-    allocate(r(nknot),rho(nknot),vpv(nknot),vsv(nknot),vph(nknot),vsh(nknot),eta(nknot))
-    rewind(io)    
-    do iknot = 1,nknot
-       if(isotropic) then
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot)
-          vph(iknot) = vpv(iknot)
-          vsh(iknot) = vsv(iknot)
-          eta(iknot) = 1.0_dp
-       else
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot),vph(iknot),vsh(iknot),eta(iknot)
-       end if
-    end do
-    close(io)
+
 
     ! non-dimensionalise
     r   = r/length_norm
@@ -358,7 +362,7 @@ contains
     logical :: isotropic,change,viscous,fluid,file_exists
     integer(i4b) :: io,iknot,nknot,ios,ncol,isec,i1,i2,ilay,i11,i22
     integer(i4b), dimension(:,:), allocatable :: sind
-    real(dp) :: tmp
+    real(dp) :: tmp,rt,rhot,vpvt,vsvt,vpht,vsht,etat,viscot
     real(dp), dimension(:), allocatable :: r,rho,vpv,vsv,vph,vsh,eta,visco
 
     !------------------------------------!
@@ -376,25 +380,29 @@ contains
     else
        stop 'maxwell_DECK: unexpected format'
     end if
+
     nknot = 0
+    allocate(r(0),rho(0),vpv(0),vsv(0),vph(0),vsh(0),eta(0),visco(0))
     do
-       read(io,*,iostat = ios) tmp
+       if(isotropic) then
+          read(io,*,iostat = ios) rt,rhot,vpvt,vsvt,viscot
+          vpht = vpvt
+          vsht = vsvt
+          etat = 1.0_dp
+       else
+          read(io,*,iostat = ios) rt,rhot,vpvt,vsvt,vpht,vsht,etat,viscot
+       end if
        if(ios /= 0) exit
        nknot = nknot + 1
+       r     = [r,rt]
+       rho   = [rho,rhot]
+       vpv   = [vpv,vpvt]
+       vsv   = [vsv,vsvt]
+       vph   = [vph,vpht]
+       vsh   = [vsh,vsht]
+       eta   = [eta,etat]
+       visco = [visco,viscot]
     end do
-    allocate(r(nknot),rho(nknot),vpv(nknot),vsv(nknot),vph(nknot),vsh(nknot),eta(nknot),visco(nknot))
-    rewind(io)    
-    do iknot = 1,nknot
-       if(isotropic) then
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot),visco(iknot)
-          vph(iknot) = vpv(iknot)
-          vsh(iknot) = vsv(iknot)
-          eta(iknot) = 1.0_dp
-       else
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot),vph(iknot),vsh(iknot),eta(iknot),visco(iknot)
-       end if
-    end do
-    close(io)
 
     ! non-dimensionalise
     r   = r/length_norm
@@ -638,7 +646,8 @@ contains
     logical :: isotropic,change,qisotropic,file_exists
     integer(i4b) :: io,iknot,nknot,ios,ncol,isec,i1,i2,ilay,i11,i22
     integer(i4b), dimension(:,:), allocatable :: sind
-    real(dp) :: tmp,qk,qm,k,m,a,c,f,l,n
+    real(dp) :: tmp,qk,qm,k,m,a,c,f,l,n,rt,rhot,vpvt,vsvt,vpht,vsht,etat, &
+                                           qAt,qCt,qFt,qLt,qNt
     real(dp), dimension(:), allocatable :: r,rho,vpv,vsv,vph,vsh,eta, &
                                            qA,qC,qF,qL,qN
 
@@ -662,30 +671,39 @@ contains
     else
        stop 'anelastic_DECK: unexpected format'
     end if
+
+
     nknot = 0
+    allocate(r(0),rho(0),vpv(0),vsv(0),vph(0),vsh(0), &
+             eta(0),qA(0),qC(0),qF(0),qL(0),qN(0))
     do
-       read(io,*,iostat = ios) tmp
+       if(isotropic .and. qisotropic) then
+          read(io,*) rt,rhot,vpvt,vsvt,qAt,qLt
+          vpht = vpvt
+          vsht = vsvt
+          etat = 1.0_dp
+       else if(.not. isotropic .and. qisotropic) then
+          read(io,*) rt,rhot,vpvt,vsvt,qAt,qLt, &
+                     vpht,vsht,etat
+       else
+          read(io,*) rt,rhot,vpvt,vsvt,qCt,qLt, &
+                    vpht,vsht,qAt,qNt,etat,qFt
+       end if       
        if(ios /= 0) exit
        nknot = nknot + 1
+       r     = [r,rt]
+       rho   = [rho,rhot]
+       vpv   = [vpv,vpvt]
+       vsv   = [vsv,vsvt]
+       vph   = [vph,vpht]
+       vsh   = [vsh,vsht]
+       eta   = [eta,etat]
+       qA    = [qA,qAt]
+       qC    = [qC,qCt]
+       qF    = [qF,qFt]
+       qL    = [qL,qLt]
+       qN    = [qN,qNt]
     end do
-    allocate(r(nknot),rho(nknot),vpv(nknot),vsv(nknot),vph(nknot),vsh(nknot), &
-             eta(nknot),qA(nknot),qC(nknot),qF(nknot),qL(nknot),qN(nknot))
-    rewind(io)    
-    do iknot = 1,nknot
-       if(isotropic .and. qisotropic) then
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot),qA(iknot),qL(iknot)
-          vph(iknot) = vpv(iknot)
-          vsh(iknot) = vsv(iknot)
-          eta(iknot) = 1.0_dp
-       else if(.not. isotropic .and. qisotropic) then
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot),qA(iknot),qL(iknot), &
-                    vph(iknot),vsh(iknot),eta(iknot)
-       else
-          read(io,*) r(iknot),rho(iknot),vpv(iknot),vsv(iknot),qC(iknot),qL(iknot), &
-                    vph(iknot),vsh(iknot),qA(iknot),qN(iknot),eta(iknot),qF(iknot)
-       end if
-    end do
-    close(io)
 
     ! non-dimensionalise
     r   = r/length_norm

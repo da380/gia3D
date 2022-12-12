@@ -5,9 +5,6 @@ program love_numbers
   use module_spherical_model
   use module_PREM
   use module_DECK
-  use module_mesh
-  use module_matrix
-  use module_force
   use module_linear_solver
   implicit none
 
@@ -15,9 +12,6 @@ program love_numbers
   integer(i4b) :: lmax,l,io
   type(spherical_model), allocatable :: model
   type(love_number), dimension(:), allocatable :: ln
-
-
-  
 
   
   if (.not. found_command_argument('-lmax',lmax)) stop 'lmax not set'

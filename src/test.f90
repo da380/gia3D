@@ -5,21 +5,20 @@ program test
   use module_special_functions
   implicit none
 
-  integer(i4b), parameter :: n = 1000001
-  integer(i4b) :: i
-  real(dp) :: r
-  real(dp), dimension(n) :: rv
+  integer(i4b) :: i,n = 10
+  real(dp) :: x
+  real(dp), dimension(:), allocatable :: xx 
 
-  call random_seed()
-  call normal_random_variable(rv)
-  
-  open(99,file='test.out')
+  allocate(xx(0))
+
   do i = 1,n
-!     call normal_random_variable(r)
-     write(99,*) rv(i)
+     x = 2*i
+     xx = [xx,x]
   end do
-  close(99)
+
+  xx = [xx,2*xx]
   
+  print *, xx
   
 
   

@@ -94,7 +94,6 @@ contains
     n = size(xx)
     call check(n == size(ff),'set_linear_interp_1D', &
                              'dimensions of arrays do not match')
-
     
     ! check the arrays are consecutive
     j = 0
@@ -113,7 +112,7 @@ contains
 
     ! store the data
     self%xx = xx
-    self%ff = ff
+    self%ff(:) = ff
 
     ! set dx_save
     self%dx_save = abs(xx(n)-xx(1))/5.0_dp

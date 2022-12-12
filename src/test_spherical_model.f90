@@ -17,7 +17,7 @@ program test_spherical_model
 
   
   model = elastic_PREM(.false.)
-  call model%write_elastic('prem.out',200)
+  call model%write_elastic('prem.out',200,isotropic=.true.)
   model = elastic_DECK('prem.out')
   call model%write_elastic('prem2.out',200)
 
