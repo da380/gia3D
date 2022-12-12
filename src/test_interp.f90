@@ -14,7 +14,7 @@ program test_interp
   type(interp_2D) :: g
   type(interp_2D_bicubic_spline) :: h
 
-
+  
   ! make the function to be interpolated
 
   nx = 100

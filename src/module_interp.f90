@@ -70,8 +70,8 @@ module module_interp
      type(interp_1D_cubic), dimension(:), allocatable :: cs
    contains
      procedure :: set => set_interp_2D_bicubic_spline
-    procedure :: delete => delete_interp_2D_bicubic_spline
-    procedure :: f    => value_interp_2D_bicubic_spline    
+     procedure :: delete => delete_interp_2D_bicubic_spline
+     procedure :: f    => value_interp_2D_bicubic_spline    
  end type interp_2D_bicubic_spline
 
  
@@ -100,7 +100,7 @@ contains
     do i = 1,n-1
        if(xx(i+1) >  xx(i)) then
           j = j+1
-       else if(xx(i+1) > xx(i)) then
+       else if(xx(i+1) < xx(i)) then
           j = j-1
        end if
     end do
@@ -112,7 +112,7 @@ contains
 
     ! store the data
     self%xx = xx
-    self%ff(:) = ff
+    self%ff = ff
 
     ! set dx_save
     self%dx_save = abs(xx(n)-xx(1))/5.0_dp
